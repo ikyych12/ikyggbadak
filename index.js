@@ -6,6 +6,100 @@ const { badakCommand, prosesBadak, pendingBadak } = require('./badak');
 const { cekumurCommand } = require('./cekumur');
 const { checkMembership } = require('./middleware');
 
+// ==================== PAIRING & USERBOT ====================
+const { Api, TelegramClient } = require('telegram');
+const { StringSession } = require('telegram/sessions');
+const input = require('input');
+const fs = require('fs');
+
+// Konfigurasi userbot (dari my.telegram.org)
+const apiId = config.api_id;
+const apiHash = config.api_hash;
+const sessionFile = './userbot_session.json';
+
+let userbotClient = null;
+let isUserbotReady = false;
+
+// Fungsi pairing (login pertama kali)
+async function doPairing() {
+    console.log('\n╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮');
+    console.log('┃      🔐 USERBOT PAIRING 🔐');
+    console.log('╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯');
+    
+    const stringSession = new StringSession('');
+    const client = new TelegramClient(stringSession, apiId, apiHash, {
+        connectionRetries: 5,
+    });
+    
+    await client.start({
+        phoneNumber: async () => {
+            console.log('\n📱 Masukkan nomor Telegram:');
+            return await input.text('Nomor: ');
+        },
+        password: async () => {
+            console.log('🔑 Masukkan password (jika ada):');
+            return await input.text('Password: ');
+        },
+        phoneCode: async () => {
+            console.log('📨 Masukkan kode verifikasi dari Telegram:');
+            return await input.text('Kode: ');
+        },
+        onError: (err) => console.log(err),
+    });
+    
+    const me = await client.getMe();
+    const sessionString = client.session.save();
+    
+    // Simpan session
+    fs.writeFileSync(sessionFile, JSON.stringify({
+        session: sessionString,
+        userId: me.id,
+        username: me.username,
+        firstName: me.firstName
+    }, null, 2));
+    
+    console.log('\n╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮');
+    console.log('┃      ✅ PAIRING BERHASIL!');
+    console.log(`┃      📱 Nama: ${me.firstName}`);
+    console.log(`┃      🆔 ID: ${me.id}`);
+    console.log(`┃      🔗 @${me.username || 'tidak ada'}`);
+    console.log('╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯');
+    
+    return { client, me, sessionString };
+}
+
+// Fungsi load userbot dari session
+async function loadUserbot() {
+    if (!fs.existsSync(sessionFile)) {
+        console.log('📌 Belum pairing, silahkan jalankan /pairing di bot');
+        return null;
+    }
+    
+    try {
+        const saved = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+        const stringSession = new StringSession(saved.session);
+        const client = new TelegramClient(stringSession, apiId, apiHash, {
+            connectionRetries: 5,
+        });
+        
+        await client.connect();
+        const me = await client.getMe();
+        
+        console.log(`✅ Userbot loaded: ${me.firstName} (@${me.username || 'no username'})`);
+        return client;
+    } catch (error) {
+        console.log('❌ Gagal load userbot:', error.message);
+        return null;
+    }
+}
+
+// Inisialisasi userbot
+(async () => {
+    userbotClient = await loadUserbot();
+    if (userbotClient) {
+        isUserbotReady = true;
+    }
+})();
 const bot = new Telegraf(config.token);
 initDB();
 
