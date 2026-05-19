@@ -17,20 +17,12 @@ async function badakCommand(ctx, nomor) {
 > 
 > /badak <nomor>
 > 
-> 📊 *Range:*
-> Free: 1-${config.badak.freeRange.max}
-> Premium: 1-${config.badak.premiumRange.max}
-> 
 > 📝 *Contoh:*
-> /badak 628123456789`;
+> /badak 628123456789
+> 
+> ℹ️ Setelah itu pilih angka target.`;
         
-        await ctx.reply(text, { 
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🦏 Contoh Badak', 'contoh_badak')],
-                [Markup.button.callback('💎 Info Premium', 'info_premium')]
-            ])
-        });
+        await ctx.reply(text, { parse_mode: 'Markdown' });
         return;
     }
     
@@ -59,23 +51,13 @@ async function badakCommand(ctx, nomor) {
         timestamp: Date.now()
     });
     
-    const maxRange = premium ? config.badak.premiumRange.max : config.badak.freeRange.max;
-    const ranges = [];
+    // Tombol angka target
+    let targets = [];
     
-    if (maxRange === 400) {
-        ranges.push(
-            { label: '🌏 1-100', value: '1-100' },
-            { label: '🌏 101-200', value: '101-200' },
-            { label: '🌏 201-300', value: '201-300' },
-            { label: '🌏 301-400', value: '301-400' }
-        );
+    if (premium) {
+        targets = [1, 10, 50, 100, 200, 300, 400];
     } else {
-        ranges.push(
-            { label: '📱 1-50', value: '1-50' },
-            { label: '📱 51-100', value: '51-100' },
-            { label: '📱 101-150', value: '101-150' },
-            { label: '📱 151-200', value: '151-200' }
-        );
+        targets = [1, 10, 50, 100, 200];
     }
     
     const text = 
@@ -83,21 +65,26 @@ async function badakCommand(ctx, nomor) {
 > 
 > 📞 Nomor: \`${cleanNomor}\`
 > 
-> 📊 *Pilih range angka:*
-> ${premium ? '💎 Premium user (1-400)' : '⚠️ Free user (1-200)'}
+> 📊 *Pilih angka target:*
+> ${premium ? '💎 Premium (1,10,50,100,200,300,400)' : '⚠️ Free (1,10,50,100,200)'}
 > 
-> Pilih salah satu range di bawah untuk mulai membadaki:`;
+> Pilih angka di bawah untuk membadaki:`;
     
+    // Buat tombol 3-4 per baris
     const buttons = [];
-    for (let i = 0; i < ranges.length; i += 2) {
-        const row = [];
-        row.push(Markup.button.callback(ranges[i].label, `badak_range_${ranges[i].value}`));
-        if (ranges[i+1]) {
-            row.push(Markup.button.callback(ranges[i+1].label, `badak_range_${ranges[i+1].value}`));
-        }
-        buttons.push(row);
-    }
+    const baris1 = [];
+    const baris2 = [];
     
+    targets.forEach((target, index) => {
+        if (index < 4) {
+            baris1.push(Markup.button.callback(`🎯 ${target}`, `badak_target_${target}`));
+        } else {
+            baris2.push(Markup.button.callback(`🎯 ${target}`, `badak_target_${target}`));
+        }
+    });
+    
+    if (baris1.length > 0) buttons.push(baris1);
+    if (baris2.length > 0) buttons.push(baris2);
     buttons.push([Markup.button.callback('❌ Batal', 'badak_batal')]);
     
     await ctx.reply(text, {
@@ -106,25 +93,22 @@ async function badakCommand(ctx, nomor) {
     });
 }
 
-async function prosesBadak(ctx, userId, nomor, range, premium) {
+async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
     const user = getUser(userId);
     const botUsername = ctx.botInfo.username;
     
-    const [min, max] = range.split('-').map(Number);
-    const targetAngka = randomInt(min, max);
-    
-    const loadingMsg = await ctx.reply(`> 🦏 *MEMBADAKI NOMOR ${nomor}...*`, { parse_mode: 'Markdown' });
+    const loadingMsg = await ctx.reply(`> 🦏 *MEMBADAKI NOMOR ${nomor} DENGAN TARGET ${targetAngka}...*`, { parse_mode: 'Markdown' });
     
     await sleep(800);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI NOMOR ${nomor}...* [Connecting to server]`, { parse_mode: 'Markdown' });
+    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI ${nomor}...* [Connecting to server]`, { parse_mode: 'Markdown' });
     await sleep(600);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI NOMOR ${nomor}...* [Bruteforce API] ███░░░░░░░ 30%`, { parse_mode: 'Markdown' });
+    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI ${nomor}...* [Bruteforce API] ███░░░░░░░ 30%`, { parse_mode: 'Markdown' });
     await sleep(500);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI NOMOR ${nomor}...* [Inject payload] ██████░░░░ 60%`, { parse_mode: 'Markdown' });
+    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI ${nomor}...* [Inject payload] ██████░░░░ 60%`, { parse_mode: 'Markdown' });
     await sleep(400);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI NOMOR ${nomor}...* [Bypass firewall] ████████░░ 80%`, { parse_mode: 'Markdown' });
+    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI ${nomor}...* [Bypass firewall] ████████░░ 80%`, { parse_mode: 'Markdown' });
     await sleep(300);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI NOMOR ${nomor}...* [Finalizing] ██████████ 100%`, { parse_mode: 'Markdown' });
+    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI ${nomor}...* [Finalizing] ██████████ 100%`, { parse_mode: 'Markdown' });
     await sleep(500);
     
     const isSuccess = randomInt(1, 100) > 30;
@@ -137,7 +121,7 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
         updateUser(userId, {
             lastBadak: Date.now(),
             totalBadak: newTotal,
-            badakList: [...(user.badakList || []), { nomor: nomor, range: range, angka: targetAngka, date: new Date().toISOString() }]
+            badakList: [...(user.badakList || []), { nomor: nomor, target: targetAngka, date: new Date().toISOString() }]
         });
         
         const successText = 
@@ -150,8 +134,7 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 📞 *Nomor:* \`${nomor}\`
-🎯 *Range:* ${range}
-🔢 *Angka kena:* ${targetAngka}
+🎯 *Target:* ${targetAngka}
 📊 *Status:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
 
 🛡️ *NOMOR ${nomor} SEKARANG KEBAL!*
@@ -203,11 +186,10 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 📞 *Nomor:* \`${nomor}\`
-🎯 *Range:* ${range}
-🔢 *Angka target:* ${targetAngka}
+🎯 *Target:* ${targetAngka}
 📊 *Status:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
 
-⚠️ *GAGAL! Coba lagi dengan range lain atau ikuti tips di bawah!*
+⚠️ *GAGAL! Coba lagi dengan target lain!*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

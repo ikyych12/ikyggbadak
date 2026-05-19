@@ -121,11 +121,10 @@ bot.action('contoh_badak', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply(`> 📝 *CONTOH BADAK*\n> \n> /badak 628123456789\n> \n> Hasilnya akan membuat nomor tersebut KEBAL BADAK!`, { parse_mode: 'Markdown' });
 });
-
-// ==================== BADAK RANGE BUTTONS ====================
-bot.action(/badak_range_(.+)/, async (ctx) => {
+// Handler untuk tombol target angka
+bot.action(/badak_target_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
-    const range = ctx.match[1];
+    const targetAngka = parseInt(ctx.match[1]);
     const userId = ctx.from.id;
     const premium = isPremium(userId);
     
@@ -142,14 +141,7 @@ bot.action(/badak_range_(.+)/, async (ctx) => {
         return;
     }
     
-    await prosesBadak(ctx, userId, pending.nomor, range, premium);
-});
-
-bot.action('badak_batal', async (ctx) => {
-    await ctx.answerCbQuery();
-    const userId = ctx.from.id;
-    pendingBadak.delete(userId);
-    await ctx.reply(`> ❌ *DIBATALKAN*\n> \n> Proses badak dibatalkan.`, { parse_mode: 'Markdown' });
+    await prosesBadak(ctx, userId, pending.nomor, targetAngka, premium);
 });
 
 // ==================== VERIFIKASI JOIN ====================
