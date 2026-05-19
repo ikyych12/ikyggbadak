@@ -1,12 +1,21 @@
 module.exports = {
-    token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",
+    // ========== BOT UTAMA (TOKEN DARI @BotFather) ==========
+    token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",",
+    
+    // ========== USERBOT (API DARI my.telegram.org) ==========
+    api_id: 1234567,
+    api_hash: "your_api_hash_here",
+    
+    // ========== OWNER ==========
     owner: 8696784568,
     
+    // ========== CHANNEL & GRUP ==========
     requiredChannel: "kyzzybadak",
     requiredGroup: "kyzzybadakk",
     channelLink: "https://t.me/kyzzybadak",
     groupLink: "https://t.me/kyzzybadakk",
     
+    // ========== FITUR BADAK ==========
     badak: {
         freeRange: { min: 1, max: 200 },
         premiumRange: { min: 1, max: 400 },
@@ -15,6 +24,7 @@ module.exports = {
         loadingTime: 3000
     },
     
+    // Provider Indonesia
     providers: {
         "62811": "Telkomsel", "62812": "Telkomsel", "62813": "Telkomsel",
         "62814": "Telkomsel", "62815": "Indosat", "62816": "Indosat",
@@ -37,8 +47,6 @@ module.exports = {
         "44": ["London", "Manchester", "Liverpool"],
         "81": ["Tokyo", "Osaka", "Yokohama"],
         "82": ["Seoul", "Busan", "Incheon"],
-        "86": ["Beijing", "Shanghai", "Guangzhou"],
-        "91": ["Mumbai", "Delhi", "Bangalore"],
-        "60": ["Kuala Lumpur", "Penang", "Johor Bahru"]
+        "86": ["Beijing", "Shanghai", "Guangzhou"]
     }
 };

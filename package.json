@@ -1,10 +1,11 @@
 {
   "name": "badak-bot",
-  "version": "1.0.0",
-  "description": "Bot Telegram dengan fitur badak & cekumur",
+  "version": "3.0.0",
+  "description": "Bot Telegram FULL fitur + Userbot kontrol",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "userbot": "node userbot.js"
   },
   "dependencies": {
     "telegraf": "^4.15.3"

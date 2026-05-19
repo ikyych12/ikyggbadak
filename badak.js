@@ -1,5 +1,5 @@
 const { isOnCooldown, randomInt, sleep, getRemainingCooldown } = require('./utils');
-const { getUser, updateUser, isPremium, getAllUsers } = require('./database');
+const { getUser, updateUser, isPremium } = require('./database');
 const { Markup } = require('telegraf');
 const config = require('./config');
 
@@ -9,6 +9,7 @@ async function badakCommand(ctx, nomor) {
     const userId = ctx.from.id;
     const user = getUser(userId);
     const premium = isPremium(userId);
+    const botUsername = ctx.botInfo.username;
     
     if (!nomor) {
         const text = 
@@ -16,12 +17,20 @@ async function badakCommand(ctx, nomor) {
 > 
 > /badak <nomor>
 > 
-> 📝 *Contoh:*
-> /badak 628123456789
+> 📊 *Range:*
+> Free: 1-${config.badak.freeRange.max}
+> Premium: 1-${config.badak.premiumRange.max}
 > 
-> ℹ️ Setelah itu pilih range angka yang ingin dibadaki.`;
+> 📝 *Contoh:*
+> /badak 628123456789`;
         
-        await ctx.reply(text, { parse_mode: 'Markdown' });
+        await ctx.reply(text, { 
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🦏 Contoh Badak', 'contoh_badak')],
+                [Markup.button.callback('💎 Info Premium', 'info_premium')]
+            ])
+        });
         return;
     }
     
@@ -32,10 +41,9 @@ async function badakCommand(ctx, nomor) {
     }
     
     if (!premium) {
-        const freeCooldown = config.badak.cooldownFree;
-        const onCooldown = isOnCooldown(user.lastBadak || 0, freeCooldown);
+        const onCooldown = isOnCooldown(user.lastBadak || 0, config.badak.cooldownFree);
         if (onCooldown) {
-            const remaining = getRemainingCooldown(user.lastBadak, freeCooldown);
+            const remaining = getRemainingCooldown(user.lastBadak, config.badak.cooldownFree);
             await ctx.reply(`> ⏰ *COOLDOWN!*\n> \n> Tunggu ${remaining} detik lagi.\n> \n> 💎 Premium = tanpa cooldown`, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
@@ -101,7 +109,6 @@ async function badakCommand(ctx, nomor) {
 async function prosesBadak(ctx, userId, nomor, range, premium) {
     const user = getUser(userId);
     const botUsername = ctx.botInfo.username;
-    const username = ctx.from.username || ctx.from.first_name;
     
     const [min, max] = range.split('-').map(Number);
     const targetAngka = randomInt(min, max);
@@ -134,42 +141,45 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
         });
         
         const successText = 
-`> ✅ *BERHASIL MEMBADAKI!*
-> 
-> @${botUsername}
-> 
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> 
-> 📞 Nomor: \`${nomor}\`
-> 🎯 Range: ${range}
-> 🔢 Angka kena: ${targetAngka}
-> 
-> 📊 *STATUS KAMU:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
-> 
-> 🛡️ *NOMOR ${nomor} SEKARANG KEBAL BADAK!*
-> 
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> 
-> 🔥 *BIAR MAKIN GACOR @${username}*
-> 
-> 📌 *AYO IKUTIN YANG DIBAWAH:*
-> 
-> 1️⃣ Pastikan nokos mu jangan dipake chatan dulu
-> 2️⃣ Pake foto profil dan bio
-> 3️⃣ Pasang 2FA
-> 4️⃣ Masuk GB dan CH bebas
-> 5️⃣ Pasang proxy di pengaturan WA (1.1.1.1)
-> 6️⃣ Diamkan 3-7 jam
-> 7️⃣ Coba dulu chatan 1-10 chat. Jika kena limit, pasang lagi proxy
-> 8️⃣ Tunggu sampai bisa ya!
-> 
-> ✅ *JIKA UDA SELAMAT! WA MU UDA BADAK (OPSIONAL)*
-> 
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> 
-> ⚠️ *GA IKUTIN CARA? KENON JANGAN KOAR-KOAR NGENTOT!*
-> 
-> @tuanmudakyzzy (owner)`;
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🦏 *@${botUsername}* 🦏
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃      ✅ *BERHASIL MEMBADAKI*
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+📞 *Nomor:* \`${nomor}\`
+🎯 *Range:* ${range}
+🔢 *Angka kena:* ${targetAngka}
+📊 *Status:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
+
+🛡️ *NOMOR ${nomor} SEKARANG KEBAL!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 *BIAR MAKIN GACOR @${ctx.from.username || ctx.from.first_name}*
+
+📌 *AYO IKUTIN YANG DIBAWAH:*
+
+1️⃣ Pastikan nokos mu jangan dipake chatan dulu
+2️⃣ Pake foto profil dan bio
+3️⃣ Pasang 2FA
+4️⃣ Masuk GB dan CH bebas
+5️⃣ Pasang proxy di pengaturan WA (1.1.1.1)
+6️⃣ Diamkan 3-7 jam
+7️⃣ Coba dulu chatan 1-10 chat. Jika kena limit, pasang lagi proxy
+8️⃣ Tunggu sampai bisa ya!
+
+✅ *JIKA UDA SELAMAT! WA MU UDA BADAK (OPSIONAL)*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ *GA IKUTIN CARA? KENON JANGAN KOAR-KOAR NGENTOT!*
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
         
         await ctx.reply(successText, {
             parse_mode: 'Markdown',
@@ -184,32 +194,34 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
         updateUser(userId, { lastBadak: Date.now() });
         
         const failedText = 
-`> ❌ *GAGAL MEMBADAKI!*
-> 
-> @${botUsername}
-> 
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> 
-> 📞 Nomor: \`${nomor}\`
-> 🎯 Range: ${range}
-> 🔢 Angka target: ${targetAngka}
-> 
-> 📊 *STATUS KAMU:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
-> 
-> ⚠️ *GAGAL! Coba lagi dengan range lain atau ikuti tips di bawah!*
-> 
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> 
-> 🔥 *TIPS GACOR:*
-> 
-> • Pake proxy 1.1.1.1
-> • Diamkan 3-7 jam
-> • Jangan chatan dulu
-> • Pasang 2FA dan foto profil
-> 
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> 
-> @tuanmudakyzzy (owner)`;
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🦏 *@${botUsername}* 🦏
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃      ❌ *GAGAL MEMBADAKI*
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+📞 *Nomor:* \`${nomor}\`
+🎯 *Range:* ${range}
+🔢 *Angka target:* ${targetAngka}
+📊 *Status:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
+
+⚠️ *GAGAL! Coba lagi dengan range lain atau ikuti tips di bawah!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 *TIPS GACOR:*
+• Pake proxy 1.1.1.1
+• Diamkan 3-7 jam
+• Jangan chatan dulu
+• Pasang 2FA dan foto profil
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
         
         await ctx.reply(failedText, {
             parse_mode: 'Markdown',
@@ -223,6 +235,4 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
     pendingBadak.delete(userId);
 }
 
-// HAPUS! mybadakCommand sudah dihilangkan
-
-module.exports = { badakCommand, prosesBadak, pendingBadak };
+module.exports = { badakCommand, mybadakCommand, prosesBadak, pendingBadak };
