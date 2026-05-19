@@ -1,9 +1,8 @@
 const { isOnCooldown, randomInt, sleep, getRemainingCooldown } = require('./utils');
-const { getUser, updateUser, isPremium } = require('./database');
+const { getUser, updateUser, isPremium, getAllUsers } = require('./database');
 const { Markup } = require('telegraf');
 const config = require('./config');
 
-// Store sementara untuk nomor yang akan dibadaki
 const pendingBadak = new Map();
 
 async function badakCommand(ctx, nomor) {
@@ -26,14 +25,12 @@ async function badakCommand(ctx, nomor) {
         return;
     }
     
-    // Validasi nomor (harus angka)
     const cleanNomor = nomor.replace(/\D/g, '');
     if (cleanNomor.length < 10) {
         await ctx.reply(`> ❌ *NOMOR TIDAK VALID*\n> \n> Masukkan nomor telepon yang benar.\n> Contoh: 628123456789`, { parse_mode: 'Markdown' });
         return;
     }
     
-    // Cek cooldown (khusus free)
     if (!premium) {
         const freeCooldown = config.badak.cooldownFree;
         const onCooldown = isOnCooldown(user.lastBadak || 0, freeCooldown);
@@ -49,17 +46,14 @@ async function badakCommand(ctx, nomor) {
         }
     }
     
-    // Simpan nomor untuk sesi ini
     pendingBadak.set(userId, {
         nomor: cleanNomor,
         timestamp: Date.now()
     });
     
-    // Tampilkan pilihan range
     const maxRange = premium ? config.badak.premiumRange.max : config.badak.freeRange.max;
     const ranges = [];
     
-    // Buat range berdasarkan maxRange
     if (maxRange === 400) {
         ranges.push(
             { label: '🌏 1-100', value: '1-100' },
@@ -107,12 +101,11 @@ async function badakCommand(ctx, nomor) {
 async function prosesBadak(ctx, userId, nomor, range, premium) {
     const user = getUser(userId);
     const botUsername = ctx.botInfo.username;
+    const username = ctx.from.username || ctx.from.first_name;
     
-    // Parse range
     const [min, max] = range.split('-').map(Number);
     const targetAngka = randomInt(min, max);
     
-    // Loading effect
     const loadingMsg = await ctx.reply(`> 🦏 *MEMBADAKI NOMOR ${nomor}...*`, { parse_mode: 'Markdown' });
     
     await sleep(800);
@@ -127,7 +120,7 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
     await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI NOMOR ${nomor}...* [Finalizing] ██████████ 100%`, { parse_mode: 'Markdown' });
     await sleep(500);
     
-    const isSuccess = randomInt(1, 100) > 30; // 70% sukses
+    const isSuccess = randomInt(1, 100) > 30;
     
     await ctx.deleteMessage(loadingMsg.message_id);
     
@@ -157,13 +150,33 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
 > 
 > ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 > 
+> 🔥 *BIAR MAKIN GACOR @${username}*
+> 
+> 📌 *AYO IKUTIN YANG DIBAWAH:*
+> 
+> 1️⃣ Pastikan nokos mu jangan dipake chatan dulu
+> 2️⃣ Pake foto profil dan bio
+> 3️⃣ Pasang 2FA
+> 4️⃣ Masuk GB dan CH bebas
+> 5️⃣ Pasang proxy di pengaturan WA (1.1.1.1)
+> 6️⃣ Diamkan 3-7 jam
+> 7️⃣ Coba dulu chatan 1-10 chat. Jika kena limit, pasang lagi proxy
+> 8️⃣ Tunggu sampai bisa ya!
+> 
+> ✅ *JIKA UDA SELAMAT! WA MU UDA BADAK (OPSIONAL)*
+> 
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> 
+> ⚠️ *GA IKUTIN CARA? KENON JANGAN KOAR-KOAR NGENTOT!*
+> 
 > @tuanmudakyzzy (owner)`;
         
         await ctx.reply(successText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.url('🔥 HUBUNG OWNER', 'https://t.me/tuanmudakyzzy')],
-                [Markup.button.callback('🦏 BADAK LAGI', 'badak_lagi'), Markup.button.callback('📋 LIST BADAK', 'mybadak')]
+                [Markup.button.callback('🦏 BADAK LAGI', 'badak_lagi')],
+                [Markup.button.callback('💎 UPGRADE PREMIUM', 'info_premium')]
             ])
         });
         
@@ -183,7 +196,16 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
 > 
 > 📊 *STATUS KAMU:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
 > 
-> ⚠️ *GAGAL! Coba lagi dengan range lain.*
+> ⚠️ *GAGAL! Coba lagi dengan range lain atau ikuti tips di bawah!*
+> 
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> 
+> 🔥 *TIPS GACOR:*
+> 
+> • Pake proxy 1.1.1.1
+> • Diamkan 3-7 jam
+> • Jangan chatan dulu
+> • Pasang 2FA dan foto profil
 > 
 > ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 > 
@@ -198,40 +220,9 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
         });
     }
     
-    // Hapus pending
     pendingBadak.delete(userId);
 }
 
-async function mybadakCommand(ctx) {
-    const userId = ctx.from.id;
-    const user = getUser(userId);
-    const badakList = user.badakList || [];
-    
-    if (badakList.length === 0) {
-        await ctx.reply(`> 📭 *DAFTAR NOMOR KEBAL*\n> \n> Kamu belum membadaki nomor apapun.\n> \n> Gunakan /badak <nomor> untuk mulai!`, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🦏 Badak Sekarang', 'badak_lagi')]
-            ])
-        });
-        return;
-    }
-    
-    let listMsg = `> 🛡️ *DAFTAR NOMOR KEBAL BADAK*\n> \n> Total: ${badakList.length} nomor\n> \n`;
-    badakList.slice(-10).reverse().forEach((item, i) => {
-        listMsg += `> ${i+1}. ${item.nomor}\n>    └ Range ${item.range} | 📅 ${new Date(item.date).toLocaleDateString('id-ID')}\n`;
-    });
-    
-    if (badakList.length > 10) {
-        listMsg += `> \n> 📌 Menampilkan 10 terbaru dari ${badakList.length}`;
-    }
-    
-    await ctx.reply(listMsg, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🦏 Badak Lagi', 'badak_lagi'), Markup.button.callback('🗑️ Hapus Semua', 'hapus_badak')]
-        ])
-    });
-}
+// HAPUS! mybadakCommand sudah dihilangkan
 
-module.exports = { badakCommand, mybadakCommand, prosesBadak, pendingBadak };
+module.exports = { badakCommand, prosesBadak, pendingBadak };
