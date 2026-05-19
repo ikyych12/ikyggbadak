@@ -235,4 +235,4 @@ async function prosesBadak(ctx, userId, nomor, range, premium) {
     pendingBadak.delete(userId);
 }
 
-module.exports = { badakCommand, mybadakCommand, prosesBadak, pendingBadak };
+module.exports = { badakCommand, prosesBadak, pendingBadak };
