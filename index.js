@@ -595,7 +595,6 @@ bot.command('listnomoruser', async (ctx) => {
     
     await ctx.reply(msg, { parse_mode: 'Markdown' });
 });
-
 bot.command('broadcast', async (ctx) => {
     if (!await isOwner(ctx.from.id)) return;
     
@@ -628,4 +627,100 @@ bot.command('broadcast', async (ctx) => {
     await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, 
 `> ✅ *BROADCAST SELESAI*
 > 
-> 📨 Berhasil: ${su
+> 📨 Berhasil: ${success}
+> ❌ Gagal: ${fail}`, { parse_mode: 'Markdown' });
+});
+
+bot.command('stats', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const users = getAllUsers();
+    const total = Object.keys(users).length;
+    const premium = Object.values(users).filter(u => u.premium).length;
+    
+    let totalBadak = 0;
+    for (const u of Object.values(users)) {
+        totalBadak += (u.totalBadak || 0);
+    }
+    
+    await ctx.reply(
+`> 📊 *STATISTIK BOT*
+> 
+> 👥 Total User: ${total}
+> 💎 Premium User: ${premium}
+> 🦏 Total Badakan: ${totalBadak}
+> ⚙️ Cooldown Free: ${customCooldown.free / 1000} detik
+> ⚙️ Cooldown Premium: ${customCooldown.premium / 1000} detik
+> 🚫 Banned User: ${bannedUsers.size}`, { parse_mode: 'Markdown' });
+});
+
+bot.command('backup', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const date = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const backupName = `backup_${date}.json`;
+    
+    try {
+        const users = getAllUsers();
+        fs.writeFileSync(backupName, JSON.stringify(users, null, 2));
+        await ctx.replyWithDocument({ source: backupName }, { caption: `📦 Backup database ${date}` });
+        fs.unlinkSync(backupName);
+    } catch (e) {
+        await ctx.reply(`> ❌ *BACKUP GAGAL*\n> \n> ${e.message}`, { parse_mode: 'Markdown' });
+    }
+});
+
+bot.command('shutdown', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    await ctx.reply(`> 🛑 *BOT SHUTDOWN*\n> \n> Bot akan dimatikan.`, { parse_mode: 'Markdown' });
+    process.exit(0);
+});
+
+bot.command('ownerhelp', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    await ctx.reply(
+`> 👑 *COMMAND OWNER*
+> 
+> ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> ┃ *Premium Management*
+> ┃ /addpremium <id> [hari]
+> ┃ /removepremium <id>
+> ┃ /listpremium
+> ┃
+> ┃ *Cooldown*
+> ┃ /setcooldown <free/premium> <detik>
+> ┃
+> ┃ *Ban Management*
+> ┃ /ban <id> [alasan]
+> ┃ /unban <id>
+> ┃ /listban
+> ┃
+> ┃ *User Management*
+> ┃ /userinfo <id>
+> ┃ /resetuser <id>
+> ┃
+> ┃ *List Nomor*
+> ┃ /listnomor - semua nomor
+> ┃ /listnomoruser <id> - per user
+> ┃
+> ┃ *Others*
+> ┃ /broadcast <pesan>
+> ┃ /stats
+> ┃ /backup
+> ┃ /shutdown
+> ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━`, { parse_mode: 'Markdown' });
+});
+
+// ==================== START BOT ====================
+
+bot.launch().then(() => {
+    console.log('✅ Badak Bot jalan...');
+    console.log('📋 Owner ID:', config.owner);
+    console.log('⚙️ Cooldown Free:', customCooldown.free / 1000, 'detik');
+    console.log('⚙️ Cooldown Premium:', customCooldown.premium / 1000, 'detik');
+});
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
