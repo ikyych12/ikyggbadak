@@ -27,7 +27,7 @@ module.exports = {
     roles: {
         VIP: {
             name: '👑 VIP',
-            price: 5000,
+            price: 15000,
             days: 30,
             maxTarget: 200,
             targets: [1, 10, 50, 100, 200],
@@ -40,7 +40,7 @@ module.exports = {
         },
         PREMIUM: {
             name: '💎 PREMIUM',
-            price: 10000,
+            price: 25000,
             days: 30,
             maxTarget: 400,
             targets: [1, 10, 50, 100, 200, 300, 400],
@@ -54,7 +54,7 @@ module.exports = {
         },
         VVIP: {
             name: '⭐ VVIP ⭐',
-            price: 25000,
+            price: 50000,
             days: 30,
             maxTarget: 400,
             targets: [1, 10, 50, 100, 200, 300, 400],
