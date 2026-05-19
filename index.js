@@ -189,4 +189,401 @@ bot.command('premium', async (ctx) => {
 > ┃ *Free User*
 > ┃ ├ Badak: cooldown 60 detik
 > ┃ ├ Range: 1-200
-> ┃ └ C
+> ┃ └ Cekumur: Indonesia only
+> ┃
+> ┃ *Premium User*
+> ┃ ├ Badak: tanpa cooldown
+> ┃ ├ Range: 1-400
+> ┃ └ Cekumur: bisa nomor LN
+> ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> 
+> 💬 Hubung owner untuk info upgrade premium!
+> 
+> @tuanmudakyzzy (owner)`;
+    }
+    
+    await ctx.reply(text, { 
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.url('💎 HUBUNG OWNER (PREMIUM)', 'https://t.me/tuanmudakyzzy')]
+        ])
+    });
+});
+
+bot.command('badak', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    const nomor = args[1];
+    await badakCommand(ctx, nomor, customCooldown);
+});
+
+bot.command('mybadak', async (ctx) => {
+    await mybadakCommand(ctx);
+});
+
+bot.command('cekumur', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    const nomor = args[1];
+    await cekumurCommand(ctx, nomor);
+});
+
+// ==================== OWNER COMMANDS ====================
+
+async function isOwner(userId) {
+    return userId === config.owner;
+}
+
+bot.command('addpremium', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /addpremium <userId> [days]`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    const days = args[2] ? parseInt(args[2]) : 30;
+    const expiredAt = new Date();
+    expiredAt.setDate(expiredAt.getDate() + days);
+    
+    setPremium(userId, true, expiredAt.toISOString());
+    
+    await ctx.reply(`> ✅ *PREMIUM ADDED*\n> \n> User ID: ${userId}\n> Durasi: ${days} hari\n> Expired: ${expiredAt.toLocaleDateString('id-ID')}`, { parse_mode: 'Markdown' });
+    
+    try {
+        await bot.telegram.sendMessage(userId, 
+`> 🎉 *SELAMAT!*
+> 
+> Anda telah diupgrade menjadi *PREMIUM* selama ${days} hari!
+> 
+> 🎁 *Fitur yang didapat:*
+> • Badak tanpa cooldown
+> • Range angka 1-400
+> • Bisa cek nomor luar negeri
+> 
+> Nikmati fitur premium! 🦏`, { parse_mode: 'Markdown' });
+    } catch (e) {}
+});
+
+bot.command('removepremium', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /removepremium <userId>`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    setPremium(userId, false, null);
+    
+    await ctx.reply(`> ✅ *PREMIUM REMOVED*\n> \n> User ID: ${userId}\n> Status: FREE USER`, { parse_mode: 'Markdown' });
+});
+
+bot.command('listpremium', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const users = getAllUsers();
+    const premiumUsers = [];
+    
+    for (const [id, user] of Object.entries(users)) {
+        if (user.premium) {
+            premiumUsers.push({ id, name: user.name || 'Unknown', expired: user.premiumExpired });
+        }
+    }
+    
+    if (premiumUsers.length === 0) {
+        await ctx.reply(`> 📭 *DAFTAR PREMIUM*\n> \n> Belum ada user premium.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    let msg = `> 💎 *DAFTAR USER PREMIUM* (${premiumUsers.length})\n> \n`;
+    premiumUsers.forEach((u, i) => {
+        const expired = u.expired ? new Date(u.expired).toLocaleDateString('id-ID') : 'Permanent';
+        msg += `> ${i+1}. ${u.name}\n>    └ ID: ${u.id} | Expired: ${expired}\n`;
+    });
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+bot.command('setcooldown', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 3) {
+        await ctx.reply(
+`> ⚙️ *CARA SET COOLDOWN*
+> 
+> /setcooldown <type> <detik>
+> 
+> *Type:*
+> • free - cooldown untuk free user
+> • premium - cooldown untuk premium user
+> 
+> *Contoh:*
+> /setcooldown free 30
+> /setcooldown free 0
+> /setcooldown premium 10
+> 
+> 📊 *Cooldown Saat Ini:*
+> Free: ${customCooldown.free / 1000} detik
+> Premium: ${customCooldown.premium / 1000} detik`,
+        { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const type = args[1].toLowerCase();
+    const seconds = parseInt(args[2]);
+    
+    if (isNaN(seconds) || seconds < 0) {
+        await ctx.reply(`> ❌ *ERROR*\n> \n> Detik harus angka positif!`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const cooldownMs = seconds * 1000;
+    
+    if (type === 'free') {
+        customCooldown.free = cooldownMs;
+        saveCooldown();
+        await ctx.reply(`> ✅ *COOLDOWN FREE UPDATED*\n> \n> Cooldown free user: ${seconds} detik`, { parse_mode: 'Markdown' });
+    } 
+    else if (type === 'premium') {
+        customCooldown.premium = cooldownMs;
+        saveCooldown();
+        await ctx.reply(`> ✅ *COOLDOWN PREMIUM UPDATED*\n> \n> Cooldown premium user: ${seconds} detik`, { parse_mode: 'Markdown' });
+    }
+    else {
+        await ctx.reply(`> ❌ *ERROR*\n> \n> Type harus 'free' atau 'premium'!`, { parse_mode: 'Markdown' });
+    }
+});
+
+bot.command('ban', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /ban <userId> [alasan]`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    const reason = args.slice(2).join(' ') || 'Tidak ada alasan';
+    
+    bannedUsers.add(userId);
+    saveBannedUsers();
+    
+    await ctx.reply(`> ✅ *USER DIBAN*\n> \n> User ID: ${userId}\n> Alasan: ${reason}`, { parse_mode: 'Markdown' });
+    
+    try {
+        await bot.telegram.sendMessage(userId, 
+`> ⚠️ *ANDA DIBAN!*
+> 
+> Anda telah diblokir dari bot ini.
+> Alasan: ${reason}
+> 
+> Hubung owner jika keberatan.`, { parse_mode: 'Markdown' });
+    } catch (e) {}
+});
+
+bot.command('unban', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /unban <userId>`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    bannedUsers.delete(userId);
+    saveBannedUsers();
+    
+    await ctx.reply(`> ✅ *USER UNBAN*\n> \n> User ID: ${userId} sudah bisa menggunakan bot lagi.`, { parse_mode: 'Markdown' });
+});
+
+bot.command('listban', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    if (bannedUsers.size === 0) {
+        await ctx.reply(`> 📭 *DAFTAR BAN*\n> \n> Belum ada user yang diban.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    let msg = `> 🚫 *DAFTAR USER BANNED* (${bannedUsers.size})\n> \n`;
+    let i = 1;
+    for (const id of bannedUsers) {
+        msg += `> ${i++}. User ID: ${id}\n`;
+    }
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+bot.command('userinfo', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /userinfo <userId>`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    const user = getUser(userId);
+    
+    await ctx.reply(
+`> 📋 *INFO USER*
+> 
+> ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> ┃ 🆔 ID: ${user.id}
+> ┃ 👤 Nama: ${user.name || 'Tidak ada'}
+> ┃ 💎 Premium: ${user.premium ? '✅ AKTIF' : '❌ TIDAK'}
+> ┃ 🦏 Total Badak: ${user.totalBadak || 0}
+> ┃ 📋 Daftar Badak: ${user.badakList ? user.badakList.length : 0} nomor
+> ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━`, { parse_mode: 'Markdown' });
+});
+
+bot.command('resetuser', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /resetuser <userId>`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    
+    updateUser(userId, {
+        totalBadak: 0,
+        badakList: [],
+        lastBadak: 0
+    });
+    
+    await ctx.reply(`> ✅ *USER DATA RESET*\n> \n> User ID: ${userId}\n> Data badak telah direset.`, { parse_mode: 'Markdown' });
+});
+
+bot.command('broadcast', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const message = ctx.message.text.replace('/broadcast', '').trim();
+    if (!message) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /broadcast <pesan>`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const users = getAllUsers();
+    let success = 0, fail = 0;
+    
+    const statusMsg = await ctx.reply(`> 📤 *BROADCAST*\n> \n> Mengirim ke ${Object.keys(users).length} user...`, { parse_mode: 'Markdown' });
+    
+    for (const [id] of Object.entries(users)) {
+        try {
+            await bot.telegram.sendMessage(id, 
+`> 📢 *BROADCAST*
+> 
+> ${message}
+> 
+> — Badak Bot 🦏`, { parse_mode: 'Markdown' });
+            success++;
+        } catch (e) {
+            fail++;
+        }
+        await new Promise(r => setTimeout(r, 50));
+    }
+    
+    await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, 
+`> ✅ *BROADCAST SELESAI*
+> 
+> 📨 Berhasil: ${success}
+> ❌ Gagal: ${fail}`, { parse_mode: 'Markdown' });
+});
+
+bot.command('stats', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const users = getAllUsers();
+    const total = Object.keys(users).length;
+    const premium = Object.values(users).filter(u => u.premium).length;
+    
+    let totalBadak = 0;
+    for (const u of Object.values(users)) {
+        totalBadak += (u.totalBadak || 0);
+    }
+    
+    await ctx.reply(
+`> 📊 *STATISTIK BOT*
+> 
+> 👥 Total User: ${total}
+> 💎 Premium User: ${premium}
+> 🦏 Total Badakan: ${totalBadak}
+> ⚙️ Cooldown Free: ${customCooldown.free / 1000} detik
+> ⚙️ Cooldown Premium: ${customCooldown.premium / 1000} detik
+> 🚫 Banned User: ${bannedUsers.size}`, { parse_mode: 'Markdown' });
+});
+
+bot.command('backup', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const date = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const backupName = `backup_${date}.json`;
+    
+    try {
+        const users = getAllUsers();
+        fs.writeFileSync(backupName, JSON.stringify(users, null, 2));
+        await ctx.replyWithDocument({ source: backupName }, { caption: `📦 Backup database ${date}` });
+        fs.unlinkSync(backupName);
+    } catch (e) {
+        await ctx.reply(`> ❌ *BACKUP GAGAL*\n> \n> ${e.message}`, { parse_mode: 'Markdown' });
+    }
+});
+
+bot.command('shutdown', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    await ctx.reply(`> 🛑 *BOT SHUTDOWN*\n> \n> Bot akan dimatikan.`, { parse_mode: 'Markdown' });
+    process.exit(0);
+});
+
+bot.command('ownerhelp', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    await ctx.reply(
+`> 👑 *COMMAND OWNER*
+> 
+> ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━
+> ┃ *Premium Management*
+> ┃ /addpremium <id> [hari]
+> ┃ /removepremium <id>
+> ┃ /listpremium
+> ┃
+> ┃ *Cooldown*
+> ┃ /setcooldown <free/premium> <detik>
+> ┃
+> ┃ *Ban Management*
+> ┃ /ban <id> [alasan]
+> ┃ /unban <id>
+> ┃ /listban
+> ┃
+> ┃ *User Management*
+> ┃ /userinfo <id>
+> ┃ /resetuser <id>
+> ┃
+> ┃ *Others*
+> ┃ /broadcast <pesan>
+> ┃ /stats
+> ┃ /backup
+> ┃ /shutdown
+> ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━`, { parse_mode: 'Markdown' });
+});
+
+// ==================== START BOT ====================
+
+bot.launch().then(() => {
+    console.log('✅ Badak Bot jalan...');
+    console.log('📋 Owner ID:', config.owner);
+    console.log('⚙️ Cooldown Free:', customCooldown.free / 1000, 'detik');
+    console.log('⚙️ Cooldown Premium:', customCooldown.premium / 1000, 'detik');
+});
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
