@@ -1,0 +1,13 @@
+{
+  "name": "badak-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram dengan fitur badak & cekumur",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.15.3",
+    "canvas": "^2.11.2"
+  }
+}
