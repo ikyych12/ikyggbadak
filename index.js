@@ -2,7 +2,7 @@ const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const config = require('./config');
 const { initDB, isPremium, setPremium, getAllUsers, getUser, updateUser } = require('./database');
-const { badakCommand, mybadakCommand } = require('./badak');
+const { badakCommand, prosesBadak, pendingBadak } = require('./badak');
 const { cekumurCommand } = require('./cekumur');
 const { checkMembership } = require('./middleware');
 
@@ -54,49 +54,11 @@ async function checkBanned(ctx, next) {
 }
 bot.use(checkBanned);
 
-
-// ==================== BADAK RANGE BUTTONS ====================
-
-const { prosesBadak, pendingBadak } = require('./badak');
-
-bot.action(/badak_range_(.+)/, async (ctx) => {
-    await ctx.answerCbQuery();
-    const range = ctx.match[1];
-    const userId = ctx.from.id;
-    const premium = isPremium(userId);
-    
-    const pending = pendingBadak.get(userId);
-    if (!pending) {
-        await ctx.reply(`> ⏰ *SESI HABIS*\n> \n> Silahkan ketik /badak <nomor> lagi.`, { parse_mode: 'Markdown' });
-        return;
-    }
-    
-    const waktu = pending.timestamp;
-    if (Date.now() - waktu > 60000) { // 1 menit timeout
-        pendingBadak.delete(userId);
-        await ctx.reply(`> ⏰ *SESI EXPIRED*\n> \n> Waktu habis. Silahkan ketik /badak <nomor> lagi.`, { parse_mode: 'Markdown' });
-        return;
-    }
-    
-    await prosesBadak(ctx, userId, pending.nomor, range, premium);
-});
-
-bot.action('badak_batal', async (ctx) => {
-    await ctx.answerCbQuery();
-    const userId = ctx.from.id;
-    pendingBadak.delete(userId);
-    await ctx.reply(`> ❌ *DIBATALKAN*\n> \n> Proses badak dibatalkan.`, { parse_mode: 'Markdown' });
-});
 // ==================== ACTION BUTTON HANDLERS ====================
 
 bot.action('badak_lagi', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply(`> 🦏 *MASUKKAN NOMOR*\n> \n> Contoh: /badak 628123456789`, { parse_mode: 'Markdown' });
-});
-
-bot.action('mybadak', async (ctx) => {
-    await ctx.answerCbQuery();
-    await mybadakCommand(ctx);
 });
 
 bot.action('hapus_badak', async (ctx) => {
@@ -148,6 +110,76 @@ bot.action('contoh_badak', async (ctx) => {
     await ctx.reply(`> 📝 *CONTOH BADAK*\n> \n> /badak 628123456789\n> \n> Hasilnya akan membuat nomor tersebut KEBAL BADAK!`, { parse_mode: 'Markdown' });
 });
 
+// ==================== BADAK RANGE BUTTONS ====================
+
+bot.action(/badak_range_(.+)/, async (ctx) => {
+    await ctx.answerCbQuery();
+    const range = ctx.match[1];
+    const userId = ctx.from.id;
+    const premium = isPremium(userId);
+    
+    const pending = pendingBadak.get(userId);
+    if (!pending) {
+        await ctx.reply(`> ⏰ *SESI HABIS*\n> \n> Silahkan ketik /badak <nomor> lagi.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const waktu = pending.timestamp;
+    if (Date.now() - waktu > 60000) {
+        pendingBadak.delete(userId);
+        await ctx.reply(`> ⏰ *SESI EXPIRED*\n> \n> Waktu habis. Silahkan ketik /badak <nomor> lagi.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    await prosesBadak(ctx, userId, pending.nomor, range, premium);
+});
+
+bot.action('badak_batal', async (ctx) => {
+    await ctx.answerCbQuery();
+    const userId = ctx.from.id;
+    pendingBadak.delete(userId);
+    await ctx.reply(`> ❌ *DIBATALKAN*\n> \n> Proses badak dibatalkan.`, { parse_mode: 'Markdown' });
+});
+
+// ==================== VERIFIKASI JOIN ====================
+
+bot.action('verify_join', async (ctx) => {
+    await ctx.answerCbQuery('Memverifikasi...');
+    const userId = ctx.from.id;
+    
+    if (userId === config.owner) {
+        await ctx.reply(`> ✅ *VERIFIKASI BERHASIL*\n> \n> Selamat datang owner!`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    try {
+        const channel = await ctx.telegram.getChatMember(`@${config.requiredChannel}`, userId);
+        const group = await ctx.telegram.getChatMember(`@${config.requiredGroup}`, userId);
+        
+        const inChannel = ['creator', 'administrator', 'member'].includes(channel.status);
+        const inGroup = ['creator', 'administrator', 'member'].includes(group.status);
+        
+        if (inChannel && inGroup) {
+            await ctx.reply(`> ✅ *VERIFIKASI BERHASIL!*\n> \n> Kamu sudah join channel dan grup.\n> Sekarang bisa menggunakan bot.\n> \n> Ketik /start untuk memulai.`, { parse_mode: 'Markdown' });
+        } else {
+            let missing = [];
+            if (!inChannel) missing.push('Channel');
+            if (!inGroup) missing.push('Grup');
+            
+            await ctx.reply(`> ❌ *VERIFIKASI GAGAL*\n> \n> Kamu masih belum join: ${missing.join(' dan ')}\n> \n> Silahkan join dulu lalu klik tombol verifikasi lagi.`, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.url('📢 Join Channel', config.channelLink)],
+                    [Markup.button.url('👥 Join Grup', config.groupLink)],
+                    [Markup.button.callback('✅ Coba lagi', 'verify_join')]
+                ])
+            });
+        }
+    } catch (error) {
+        await ctx.reply(`> ❌ *ERROR VERIFIKASI*\n> \n> Pastikan bot adalah admin di channel & grup.`, { parse_mode: 'Markdown' });
+    }
+});
+
 // ==================== COMMANDS USER ====================
 
 bot.command('start', async (ctx) => {
@@ -170,7 +202,6 @@ bot.command('start', async (ctx) => {
 > 📖 *Perintah Tersedia*
 > 
 > 🦏 /badak <nomor> - Buat nomor jadi kebal
-> 📋 /mybadak - Lihat daftar nomor kebalmu
 > 🔍 /cekumur <nomor> - Cek provider & masa aktif
 > 💎 /premium - Cek status premium
 > 
@@ -246,11 +277,7 @@ bot.command('premium', async (ctx) => {
 bot.command('badak', async (ctx) => {
     const args = ctx.message.text.split(' ');
     const nomor = args[1];
-    await badakCommand(ctx, nomor, customCooldown);
-});
-
-bot.command('mybadak', async (ctx) => {
-    await mybadakCommand(ctx);
+    await badakCommand(ctx, nomor);
 });
 
 bot.command('cekumur', async (ctx) => {
@@ -495,6 +522,80 @@ bot.command('resetuser', async (ctx) => {
     await ctx.reply(`> ✅ *USER DATA RESET*\n> \n> User ID: ${userId}\n> Data badak telah direset.`, { parse_mode: 'Markdown' });
 });
 
+bot.command('listnomor', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const users = getAllUsers();
+    let allBadak = [];
+    
+    for (const [userId, user] of Object.entries(users)) {
+        if (user.badakList && user.badakList.length > 0) {
+            for (const badak of user.badakList) {
+                allBadak.push({
+                    userId: userId,
+                    userName: user.name || 'Unknown',
+                    nomor: badak.nomor,
+                    range: badak.range,
+                    tanggal: badak.date
+                });
+            }
+        }
+    }
+    
+    if (allBadak.length === 0) {
+        await ctx.reply(`> 📭 *LIST NOMOR*\n> \n> Belum ada nomor yang dibadaki.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    allBadak.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    
+    let msg = `> 📋 *LIST SEMUA NOMOR YANG DIBAKADAI*\n> \n> Total: ${allBadak.length} nomor\n> \n`;
+    
+    const displayCount = Math.min(20, allBadak.length);
+    for (let i = 0; i < displayCount; i++) {
+        const b = allBadak[i];
+        const date = new Date(b.tanggal).toLocaleDateString('id-ID');
+        msg += `> ${i+1}. 📞 \`${b.nomor}\`\n`;
+        msg += `>    └ 👤 ${b.userName} (${b.userId}) | ${b.range} | ${date}\n`;
+    }
+    
+    if (allBadak.length > 20) {
+        msg += `> \n> 📌 Menampilkan 20 terbaru dari ${allBadak.length} nomor`;
+    }
+    
+    msg += `\n> \n> @tuanmudakyzzy (owner)`;
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+bot.command('listnomoruser', async (ctx) => {
+    if (!await isOwner(ctx.from.id)) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(`> ❌ *CARA PENGGUNAAN*\n> \n> /listnomoruser <userId>\n> \n> Contoh: /listnomoruser 123456789`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const targetUserId = parseInt(args[1]);
+    const user = getUser(targetUserId);
+    
+    if (!user || !user.badakList || user.badakList.length === 0) {
+        await ctx.reply(`> 📭 *LIST NOMOR USER*\n> \n> User ${targetUserId} belum membadaki nomor apapun.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    let msg = `> 📋 *NOMOR YANG DIBAKADAI OLEH ${user.name || targetUserId}*\n> \n> Total: ${user.badakList.length} nomor\n> \n`;
+    
+    user.badakList.slice(-15).reverse().forEach((item, i) => {
+        const date = new Date(item.date).toLocaleDateString('id-ID');
+        msg += `> ${i+1}. 📞 \`${item.nomor}\`\n`;
+        msg += `>    └ Range ${item.range} | ${date}\n`;
+    });
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
 bot.command('broadcast', async (ctx) => {
     if (!await isOwner(ctx.from.id)) return;
     
@@ -527,96 +628,4 @@ bot.command('broadcast', async (ctx) => {
     await ctx.telegram.editMessageText(ctx.chat.id, statusMsg.message_id, null, 
 `> ✅ *BROADCAST SELESAI*
 > 
-> 📨 Berhasil: ${success}
-> ❌ Gagal: ${fail}`, { parse_mode: 'Markdown' });
-});
-
-bot.command('stats', async (ctx) => {
-    if (!await isOwner(ctx.from.id)) return;
-    
-    const users = getAllUsers();
-    const total = Object.keys(users).length;
-    const premium = Object.values(users).filter(u => u.premium).length;
-    
-    let totalBadak = 0;
-    for (const u of Object.values(users)) {
-        totalBadak += (u.totalBadak || 0);
-    }
-    
-    await ctx.reply(
-`> 📊 *STATISTIK BOT*
-> 
-> 👥 Total User: ${total}
-> 💎 Premium User: ${premium}
-> 🦏 Total Badakan: ${totalBadak}
-> ⚙️ Cooldown Free: ${customCooldown.free / 1000} detik
-> ⚙️ Cooldown Premium: ${customCooldown.premium / 1000} detik
-> 🚫 Banned User: ${bannedUsers.size}`, { parse_mode: 'Markdown' });
-});
-
-bot.command('backup', async (ctx) => {
-    if (!await isOwner(ctx.from.id)) return;
-    
-    const date = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    const backupName = `backup_${date}.json`;
-    
-    try {
-        const users = getAllUsers();
-        fs.writeFileSync(backupName, JSON.stringify(users, null, 2));
-        await ctx.replyWithDocument({ source: backupName }, { caption: `📦 Backup database ${date}` });
-        fs.unlinkSync(backupName);
-    } catch (e) {
-        await ctx.reply(`> ❌ *BACKUP GAGAL*\n> \n> ${e.message}`, { parse_mode: 'Markdown' });
-    }
-});
-
-bot.command('shutdown', async (ctx) => {
-    if (!await isOwner(ctx.from.id)) return;
-    
-    await ctx.reply(`> 🛑 *BOT SHUTDOWN*\n> \n> Bot akan dimatikan.`, { parse_mode: 'Markdown' });
-    process.exit(0);
-});
-
-bot.command('ownerhelp', async (ctx) => {
-    if (!await isOwner(ctx.from.id)) return;
-    
-    await ctx.reply(
-`> 👑 *COMMAND OWNER*
-> 
-> ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> ┃ *Premium Management*
-> ┃ /addpremium <id> [hari]
-> ┃ /removepremium <id>
-> ┃ /listpremium
-> ┃
-> ┃ *Cooldown*
-> ┃ /setcooldown <free/premium> <detik>
-> ┃
-> ┃ *Ban Management*
-> ┃ /ban <id> [alasan]
-> ┃ /unban <id>
-> ┃ /listban
-> ┃
-> ┃ *User Management*
-> ┃ /userinfo <id>
-> ┃ /resetuser <id>
-> ┃
-> ┃ *Others*
-> ┃ /broadcast <pesan>
-> ┃ /stats
-> ┃ /backup
-> ┃ /shutdown
-> ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━`, { parse_mode: 'Markdown' });
-});
-
-// ==================== START BOT ====================
-
-bot.launch().then(() => {
-    console.log('✅ Badak Bot jalan...');
-    console.log('📋 Owner ID:', config.owner);
-    console.log('⚙️ Cooldown Free:', customCooldown.free / 1000, 'detik');
-    console.log('⚙️ Cooldown Premium:', customCooldown.premium / 1000, 'detik');
-});
-
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+> 📨 Berhasil: ${su
