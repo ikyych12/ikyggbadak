@@ -3,8 +3,8 @@ module.exports = {
     token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",",
     
     // ========== USERBOT (API DARI my.telegram.org) ==========
-    api_id: 1234567,
-    api_hash: "your_api_hash_here",
+    api_id: 32334258,
+    api_hash: "dfcc9091435ce0fb51483ae67e290ea3",
     
     // ========== OWNER ==========
     owner: 8696784568,
