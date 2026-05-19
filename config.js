@@ -1,6 +1,6 @@
 module.exports = {
     // ========== BOT UTAMA (TOKEN DARI @BotFather) ==========
-    token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",",
+    token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",
     
   
   
