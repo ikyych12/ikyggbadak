@@ -51,7 +51,7 @@ function isPremium(userId) {
     const user = getUser(userId);
     if (!user.premium) return false;
     if (user.premiumExpired && new Date(user.premiumExpired) < new Date()) {
-        updateUser(userId, { premium: false });
+        updateUser(userId, { premium: false, premiumExpired: null });
         return false;
     }
     return true;
