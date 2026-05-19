@@ -54,6 +54,39 @@ async function checkBanned(ctx, next) {
 }
 bot.use(checkBanned);
 
+
+// ==================== BADAK RANGE BUTTONS ====================
+
+const { prosesBadak, pendingBadak } = require('./badak');
+
+bot.action(/badak_range_(.+)/, async (ctx) => {
+    await ctx.answerCbQuery();
+    const range = ctx.match[1];
+    const userId = ctx.from.id;
+    const premium = isPremium(userId);
+    
+    const pending = pendingBadak.get(userId);
+    if (!pending) {
+        await ctx.reply(`> ⏰ *SESI HABIS*\n> \n> Silahkan ketik /badak <nomor> lagi.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const waktu = pending.timestamp;
+    if (Date.now() - waktu > 60000) { // 1 menit timeout
+        pendingBadak.delete(userId);
+        await ctx.reply(`> ⏰ *SESI EXPIRED*\n> \n> Waktu habis. Silahkan ketik /badak <nomor> lagi.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    await prosesBadak(ctx, userId, pending.nomor, range, premium);
+});
+
+bot.action('badak_batal', async (ctx) => {
+    await ctx.answerCbQuery();
+    const userId = ctx.from.id;
+    pendingBadak.delete(userId);
+    await ctx.reply(`> ❌ *DIBATALKAN*\n> \n> Proses badak dibatalkan.`, { parse_mode: 'Markdown' });
+});
 // ==================== ACTION BUTTON HANDLERS ====================
 
 bot.action('badak_lagi', async (ctx) => {
