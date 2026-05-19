@@ -1,11 +1,10 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const config = require('./config');
-const { initDB, isPremium, setPremium, getAllUsers, getUser, updateUser } = require('./database');
+const { initDB, isPremium, setPremium, getAllUsers, getUser, updateUser, getRole, setRole, getSellPrice, canSellRole, getTransactions } = require('./database');
 const { badakCommand, prosesBadak, pendingBadak } = require('./badak');
 const { cekumurCommand } = require('./cekumur');
 const { checkMembership } = require('./middleware');
-
 const bot = new Telegraf(config.token);
 initDB();
 bot.use(checkMembership);
@@ -99,9 +98,9 @@ bot.action('info_premium', async (ctx) => {
 > • Prioritas support 🚀
 > 
 > *Harga:*
-> 30 hari = 10k
-> 60 hari = 15k
-> 90 hari = 20k
+> 7 hari = 10k
+> 30 hari = 25k
+> 60 hari = 50k
 > 
 > @tuanmudakyzzy (owner)`,
         { parse_mode: 'Markdown',
@@ -206,7 +205,6 @@ bot.command('start', async (ctx) => {
 > ┃
 > ┃ ├ Nama: @${username}
 > ┃ ├ Status: ${statusIcon}
-> ┃ └ Total Badak: ${totalBadak} nomor
 > ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━
 > 
 > 📖 *PERINTAH TERSEDIA*
@@ -214,7 +212,7 @@ bot.command('start', async (ctx) => {
 > 🦏 /badak <nomor> - Buat nomor jadi kebal
 > 🔍 /cekumur <nomor> - Cek provider & masa aktif
 > 💎 /premium - Cek status premium
-> 📋 /mybadak - Lihat daftar nomor kebalmu
+> 📋 /harga - Lihat harga  role
 > 
 > ⚡ *Tips:* Kirim /badak 628xxx untuk mulai!
 > 
@@ -224,7 +222,7 @@ bot.command('start', async (ctx) => {
     
     const keyboard = [
         [Markup.button.callback('🦏 BADAK SEKARANG', 'badak_lagi'), Markup.button.callback('🔍 CEK UMUR', 'cekumur_lagi')],
-        [Markup.button.callback('💎 INFO PREMIUM', 'info_premium'), Markup.button.callback('📋 MYBADAK', 'mybadak')],
+        [Markup.button.callback('💎 INFO PREMIUM', 'info_premium'), Markup.button.callback('📋 HARGA ROLE', 'Harga')],
         [Markup.button.url('🔥 HUBUNG OWNER', 'https://t.me/tuanmudakyzzy')]
     ];
     
