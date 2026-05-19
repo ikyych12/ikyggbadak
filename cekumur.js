@@ -59,7 +59,7 @@ function generateCekUmur(nomor, isPremiumUser = false) {
     if (isInternational && isPremiumUser) {
         negara = config.internationalProviders[countryCode];
         provider = `${negara} ${seededRandom(1, 5)}G`;
-        const regions = config.internationalRegions[countryCode] || ["Capital City", "Metropolitan"];
+        const regions = config.internationalRegions[countryCode] || ["Capital City"];
         wilayah = regions[seededRandom(0, regions.length - 1)];
     } else if (isInternational && !isPremiumUser) {
         return { error: "premium_required" };
@@ -73,15 +73,27 @@ function generateCekUmur(nomor, isPremiumUser = false) {
         negara = "Indonesia";
     }
     
-    const aktifTahun = seededRandom(2018, 2026);
-    const aktifBulan = seededRandom(1, 12);
-    const aktifHari = seededRandom(1, 28);
+    // Masa Aktif: tahun bebas, tapi untuk 2026 hanya bulan Jan/Feb
+    const sekarang = new Date();
+    const currentYear = sekarang.getFullYear();
+    
+    let aktifTahun = seededRandom(2018, currentYear);
+    let aktifBulan = seededRandom(1, 12);
+    let aktifHari = seededRandom(1, 28);
+    
+    // Khusus tahun 2026, batasi bulan ke Jan/Feb
+    if (aktifTahun === 2026) {
+        aktifBulan = seededRandom(1, 2);
+        aktifHari = seededRandom(1, 28);
+    }
+    
+    // Kalau tahunnya 2026 tapi bulan > sekarang? gak mungkin karena 2026 cuma Jan/Feb
     const masaAktif = `${aktifTahun}-${String(aktifBulan).padStart(2, '0')}-${String(aktifHari).padStart(2, '0')}`;
     const umur = hitungUmur(masaAktif);
     
-    const statusList = ["Active", "Inactive", "Pending", "Suspended"];
+    const statusList = ["Active", "Active", "Active", "Inactive"];
     const status = statusList[seededRandom(0, statusList.length - 1)];
-    const tipeList = ["Prepaid", "Postpaid", "Corporate", "Residential"];
+    const tipeList = ["Prepaid", "Prepaid", "Prepaid", "Postpaid"];
     const tipe = tipeList[seededRandom(0, tipeList.length - 1)];
     
     return { nomor, negara, provider, wilayah, masaAktif, umur, status, tipe, lastCek: new Date().toISOString() };
@@ -90,35 +102,49 @@ function generateCekUmur(nomor, isPremiumUser = false) {
 async function cekumurCommand(ctx, nomor) {
     const userId = ctx.from.id;
     const premium = isPremium(userId);
+    const botUsername = ctx.botInfo.username;
     
     if (!nomor) {
         const text = 
-`> ❌ *CARA PENGGUNAAN*
-> 
-> /cekumur <nomor>
-> 
-> 📝 *Contoh:*
-> /cekumur 6285712345678 (Indonesia)
-> /cekumur 14155551234 (USA) - *Premium only*
-> 
-> 💎 Premium bisa cek nomor luar negeri!`;
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🔍 *CEK UMUR NOMOR* 🔍
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📝 *Cara penggunaan:*
+/cekumur <nomor>
+
+📌 *Contoh Indonesia:*
+/cekumur 628123456789
+
+🌍 *Contoh Luar Negeri (PREMIUM ONLY):*
+/cekumur 14155551234 (USA)
+
+💎 *Premium bisa cek nomor luar negeri!*
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
         
-        await ctx.reply(text, { 
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('💎 Info Premium', 'info_premium')],
-                [Markup.button.url('🔥 Hubung Owner', 'https://t.me/tuanmudakyzzy')]
-            ])
-        });
+        await ctx.reply(text, { parse_mode: 'Markdown' });
         return;
     }
     
     let cleanNomor = nomor.replace(/\D/g, '');
-    if (cleanNomor.startsWith('0')) {
-        cleanNomor = '62' + cleanNomor.substring(1);
+    const isIndo = cleanNomor.startsWith('62');
+    
+    if (isIndo && cleanNomor.length < 12) {
+        await ctx.reply(`> ❌ Nomor Indonesia minimal 10 digit\n> Contoh: 628123456789`, { parse_mode: 'Markdown' });
+        return;
     }
-    if (!cleanNomor.startsWith('62') && !cleanNomor.startsWith('1') && !cleanNomor.startsWith('4') && !cleanNomor.startsWith('6') && !cleanNomor.startsWith('8')) {
-        cleanNomor = '62' + cleanNomor;
+    
+    if (!isIndo && !premium) {
+        await ctx.reply(
+`> 🌍 *NOMOR LUAR NEGERI*
+> 
+> ⚠️ Nomor luar negeri hanya bisa dicek oleh user PREMIUM!
+> 
+> 💬 Hubung owner untuk upgrade!`, { parse_mode: 'Markdown' });
+        return;
     }
     
     let data = getCekUmur(cleanNomor);
@@ -127,9 +153,9 @@ async function cekumurCommand(ctx, nomor) {
         const loadingMsg = await ctx.reply(`> 🔍 *Mengecek umur nomor ${cleanNomor}...*`, { parse_mode: 'Markdown' });
         
         await sleep(800);
-        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🔍 *Mengecek umur nomor ${cleanNomor}...* [Akses database operator]`, { parse_mode: 'Markdown' });
+        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🔍 *Mengecek...* [Database]`, { parse_mode: 'Markdown' });
         await sleep(600);
-        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🔍 *Mengecek umur nomor ${cleanNomor}...* [Verifikasi ke server Dukcapil]`, { parse_mode: 'Markdown' });
+        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🔍 *Mengecek...* [Verifikasi]`, { parse_mode: 'Markdown' });
         await sleep(500);
         
         data = generateCekUmur(cleanNomor, premium);
@@ -140,31 +166,14 @@ async function cekumurCommand(ctx, nomor) {
     }
     
     if (data.error === "premium_required") {
-        await ctx.reply(
-`> 🌍 *NOMOR INTERNASIONAL DETEKSI*
-> 
-> Nomor ${cleanNomor} hanya bisa dicek oleh user PREMIUM!
-> 
-> 💎 *Upgrade ke premium untuk:*
-> • Cek nomor luar negeri
-> • Badak tanpa cooldown
-> • Range angka 1-400
-> 
-> @tuanmudakyzzy (owner)`,
-            { 
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.url('💎 HUBUNG OWNER (PREMIUM)', 'https://t.me/tuanmudakyzzy')]
-                ])
-            }
-        );
+        await ctx.reply(`> 🌍 Nomor luar negeri hanya untuk PREMIUM!`, { parse_mode: 'Markdown' });
         return;
     }
     
     const username = ctx.from.username || ctx.from.first_name;
     const resultText = 
 `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃      🦏 *@${ctx.botInfo.username}* 🦏
+┃      🦏 *@${botUsername}* 🦏
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 > *HALLO PENGGUNA @${username}*
@@ -186,8 +195,6 @@ async function cekumurCommand(ctx, nomor) {
 > > ┃ 🏷️ Tipe: ${data.tipe}
 > > ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━
 > > 
-> > 🕐 Terakhir dicek: ${new Date(data.lastCek).toLocaleString('id-ID')}
-> > 🔒 Hasil permanen (sama jika dicek siapapun)
 > 
 > ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 > 
@@ -205,7 +212,7 @@ async function cekumurCommand(ctx, nomor) {
             premium ? 
                 [Markup.button.callback('🦏 BADAK SEKARANG', 'badak_lagi')] :
                 [Markup.button.url('💎 UPGRADE PREMIUM', 'https://t.me/tuanmudakyzzy')],
-            [Markup.button.callback('🔄 CEK LAGI', 'cekumur_lagi'), Markup.button.url('🔥 HUBUNG OWNER', 'https://t.me/tuanmudakyzzy')]
+            [Markup.button.callback('🔄 CEK LAGI', 'cekumur_lagi')]
         ])
     });
 }
