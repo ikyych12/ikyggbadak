@@ -1,76 +1,135 @@
 const { isOnCooldown, randomInt, sleep, getRemainingCooldown } = require('./utils');
-const { getUser, updateUser, isPremium } = require('./database');
+const { getUser, updateUser, getRole } = require('./database');
 const { Markup } = require('telegraf');
 const config = require('./config');
 
 const pendingBadak = new Map();
 
+function getCountryFromNumber(nomor) {
+    for (let len = 3; len >= 1; len--) {
+        const prefix = nomor.substring(0, len);
+        if (config.internationalProviders[prefix]) {
+            return { code: prefix, country: config.internationalProviders[prefix] };
+        }
+    }
+    return null;
+}
+
 async function badakCommand(ctx, nomor) {
     const userId = ctx.from.id;
     const user = getUser(userId);
-    const premium = isPremium(userId);
+    const role = getRole(userId);
     const botUsername = ctx.botInfo.username;
     
     if (!nomor) {
         const text = 
-`> ❌ *CARA PENGGUNAAN*
-> 
-> /badak <nomor>
-> 
-> 📝 *Contoh:*
-> /badak 628123456789
-> 
-> ℹ️ Setelah itu pilih angka target.`;
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🦏 *BADAK NOMOR* 🦏
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📝 *Cara penggunaan:*
+/badak <nomor>
+
+📌 *Contoh Indonesia:*
+/badak 628123456789
+
+🌍 *Contoh Luar Negeri (PREMIUM+):*
+/badak 14155551234 (USA)
+
+💎 *Role & Target Maksimal:*
+• FREE: 200
+• VIP: 200
+• PREMIUM: 400
+• VVIP: 400
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
         
         await ctx.reply(text, { parse_mode: 'Markdown' });
         return;
     }
     
-    const cleanNomor = nomor.replace(/\D/g, '');
-    if (cleanNomor.length < 10) {
-        await ctx.reply(`> ❌ *NOMOR TIDAK VALID*\n> \n> Masukkan nomor telepon yang benar.\n> Contoh: 628123456789`, { parse_mode: 'Markdown' });
-        return;
+    let cleanNomor = nomor.replace(/\D/g, '');
+    const isIndo = cleanNomor.startsWith('62');
+    let countryInfo = null;
+    
+    if (!isIndo) {
+        countryInfo = getCountryFromNumber(cleanNomor);
     }
     
-    if (!premium) {
+    // Validasi nomor Indonesia
+    if (isIndo) {
+        if (cleanNomor.length < 12) {
+            await ctx.reply(`> ❌ Nomor Indonesia minimal 10 digit\n> Contoh: 628123456789`, { parse_mode: 'Markdown' });
+            return;
+        }
+    } 
+    // Validasi nomor luar negeri
+    else {
+        if (role === 'FREE') {
+            await ctx.reply(
+`> 🌍 *NOMOR LUAR NEGERI*
+> 
+> ⚠️ Nomor luar negeri hanya bisa dibadaki oleh VIP, PREMIUM, atau VVIP!
+> 
+> 💬 Hubung owner untuk upgrade role!`, { parse_mode: 'Markdown' });
+            return;
+        }
+        
+        if (cleanNomor.length < 10) {
+            await ctx.reply(`> ❌ Nomor luar negeri minimal 10 digit`, { parse_mode: 'Markdown' });
+            return;
+        }
+        
+        if (!countryInfo) {
+            await ctx.reply(`> ❌ Kode negara tidak terdaftar`, { parse_mode: 'Markdown' });
+            return;
+        }
+    }
+    
+    // Cek cooldown untuk FREE
+    if (role === 'FREE') {
         const onCooldown = isOnCooldown(user.lastBadak || 0, config.badak.cooldownFree);
         if (onCooldown) {
             const remaining = getRemainingCooldown(user.lastBadak, config.badak.cooldownFree);
-            await ctx.reply(`> ⏰ *COOLDOWN!*\n> \n> Tunggu ${remaining} detik lagi.\n> \n> 💎 Premium = tanpa cooldown`, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('💎 Upgrade Premium', 'info_premium')]
-                ])
-            });
+            await ctx.reply(`> ⏰ *COOLDOWN!*\n> \n> Tunggu ${remaining} detik lagi.\n> \n> Upgrade role untuk tanpa cooldown!`, { parse_mode: 'Markdown' });
             return;
         }
     }
     
     pendingBadak.set(userId, {
         nomor: cleanNomor,
+        countryInfo: countryInfo,
         timestamp: Date.now()
     });
     
-    // Tombol angka target
+    // Tombol target berdasarkan role
     let targets = [];
-    
-    if (premium) {
+    if (role === 'VVIP' || role === 'PREMIUM') {
         targets = [1, 10, 50, 100, 200, 300, 400];
     } else {
         targets = [1, 10, 50, 100, 200];
     }
     
-    const text = 
-`> 🦏 *BADAK NOMOR*
-> 
-> 📞 Nomor: \`${cleanNomor}\`
-> 
-> 📊 *Pilih angka target:*
-> ${premium ? '💎 Premium (1,10,50,100,200,300,400)' : '⚠️ Free (1,10,50,100,200)'}
-> 
-> Pilih angka di bawah untuk membadaki:`;
+    const roleNames = { FREE: '⚠️ FREE', VIP: '👑 VIP', PREMIUM: '💎 PREMIUM', VVIP: '⭐ VVIP ⭐' };
+    const countryText = countryInfo ? ` (${countryInfo.country})` : '';
     
-    // Buat tombol 3-4 per baris
+    const text = 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🦏 *BADAK NOMOR* 🦏
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+📞 Nomor: \`${cleanNomor}\`${countryText}
+👑 Role: ${roleNames[role]}
+
+📌 *Pilih angka target:*
+${targets.join(', ')}
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    
     const buttons = [];
     const baris1 = [];
     const baris2 = [];
@@ -95,9 +154,12 @@ async function badakCommand(ctx, nomor) {
 
 async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
     const user = getUser(userId);
+    const role = getRole(userId);
     const botUsername = ctx.botInfo.username;
+    const countryInfo = getCountryFromNumber(nomor);
+    const countryText = countryInfo ? ` (${countryInfo.country})` : '';
     
-    const loadingMsg = await ctx.reply(`> 🦏 *MEMBADAKI NOMOR ${nomor} DENGAN TARGET ${targetAngka}...*`, { parse_mode: 'Markdown' });
+    const loadingMsg = await ctx.reply(`> 🦏 *MEMBADAKI NOMOR ${nomor}${countryText} DENGAN TARGET ${targetAngka}...*`, { parse_mode: 'Markdown' });
     
     await sleep(800);
     await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, `> 🦏 *MEMBADAKI ${nomor}...* [Connecting to server]`, { parse_mode: 'Markdown' });
@@ -115,13 +177,20 @@ async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
     
     await ctx.deleteMessage(loadingMsg.message_id);
     
+    const roleNames = { FREE: '⚠️ FREE', VIP: '👑 VIP', PREMIUM: '💎 PREMIUM', VVIP: '⭐ VVIP ⭐' };
+    
     if (isSuccess) {
         const newTotal = (user.totalBadak || 0) + 1;
         
         updateUser(userId, {
             lastBadak: Date.now(),
             totalBadak: newTotal,
-            badakList: [...(user.badakList || []), { nomor: nomor, target: targetAngka, date: new Date().toISOString() }]
+            badakList: [...(user.badakList || []), { 
+                nomor: nomor, 
+                negara: countryInfo?.country || 'Indonesia',
+                target: targetAngka, 
+                date: new Date().toISOString() 
+            }]
         });
         
         const successText = 
@@ -133,9 +202,9 @@ async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
 ┃      ✅ *BERHASIL MEMBADAKI*
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-📞 *Nomor:* \`${nomor}\`
+📞 *Nomor:* \`${nomor}\`${countryText}
 🎯 *Target:* ${targetAngka}
-📊 *Status:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
+👑 *Role:* ${roleNames[role]}
 
 🛡️ *NOMOR ${nomor} SEKARANG KEBAL!*
 
@@ -169,7 +238,7 @@ async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
             ...Markup.inlineKeyboard([
                 [Markup.button.url('🔥 HUBUNG OWNER', 'https://t.me/tuanmudakyzzy')],
                 [Markup.button.callback('🦏 BADAK LAGI', 'badak_lagi')],
-                [Markup.button.callback('💎 UPGRADE PREMIUM', 'info_premium')]
+                [Markup.button.callback('💎 INFO ROLE', 'info_premium')]
             ])
         });
         
@@ -185,9 +254,9 @@ async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
 ┃      ❌ *GAGAL MEMBADAKI*
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-📞 *Nomor:* \`${nomor}\`
+📞 *Nomor:* \`${nomor}\`${countryText}
 🎯 *Target:* ${targetAngka}
-📊 *Status:* ${premium ? '💎 PREMIUM' : '⚠️ FREE'}
+👑 *Role:* ${roleNames[role]}
 
 ⚠️ *GAGAL! Coba lagi dengan target lain!*
 
@@ -208,7 +277,7 @@ async function prosesBadak(ctx, userId, nomor, targetAngka, premium) {
         await ctx.reply(failedText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.url('💎 UPGRADE PREMIUM', 'https://t.me/tuanmudakyzzy')],
+                [Markup.button.url('💎 UPGRADE ROLE', 'https://t.me/tuanmudakyzzy')],
                 [Markup.button.callback('🔄 COBA LAGI', 'badak_lagi')]
             ])
         });

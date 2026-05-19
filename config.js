@@ -1,11 +1,10 @@
 module.exports = {
     // ========== BOT UTAMA (TOKEN DARI @BotFather) ==========
-    token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",
+    token: "8923762099:AAEmDIEF-eKnQZf2hhiB8LQb18qXHSpZzy8",",
     
-    // ========== USERBOT (API DARI my.telegram.org) ==========
-    api_id: 32334258,
-    api_hash: "dfcc9091435ce0fb51483ae67e290ea3",
-    
+  
+  
+  
     // ========== OWNER ==========
     owner: 8696784568,
     
@@ -24,7 +23,52 @@ module.exports = {
         loadingTime: 3000
     },
     
-    // Provider Indonesia
+    // Daftar Role & Harga
+    roles: {
+        VIP: {
+            name: '👑 VIP',
+            price: 5000,
+            days: 30,
+            maxTarget: 200,
+            targets: [1, 10, 50, 100, 200],
+            benefits: [
+                '✅ Badak tanpa cooldown',
+                '✅ Target hingga 200',
+                '✅ Cek nomor luar negeri'
+            ],
+            canSell: ['VIP']  // bisa jual role apa aja
+        },
+        PREMIUM: {
+            name: '💎 PREMIUM',
+            price: 10000,
+            days: 30,
+            maxTarget: 400,
+            targets: [1, 10, 50, 100, 200, 300, 400],
+            benefits: [
+                '✅ Badak tanpa cooldown',
+                '✅ Target hingga 400',
+                '✅ Cek & Badak nomor luar negeri',
+                '✅ Support prioritas'
+            ],
+            canSell: ['VIP', 'PREMIUM']
+        },
+        VVIP: {
+            name: '⭐ VVIP ⭐',
+            price: 25000,
+            days: 30,
+            maxTarget: 400,
+            targets: [1, 10, 50, 100, 200, 300, 400],
+            benefits: [
+                '✅ Badak tanpa cooldown',
+                '✅ Target hingga 400',
+                '✅ Cek & Badak nomor luar negeri',
+                '✅ Support 24/7',
+                '✅ Bisa jual semua role'
+            ],
+            canSell: ['VIP', 'PREMIUM', 'VVIP']
+        }
+    },
+    
     providers: {
         "62811": "Telkomsel", "62812": "Telkomsel", "62813": "Telkomsel",
         "62814": "Telkomsel", "62815": "Indosat", "62816": "Indosat",

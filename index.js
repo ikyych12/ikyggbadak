@@ -561,6 +561,354 @@ bot.action('admin_stats', async (ctx) => {
     );
 });
 
+
+
+// ==================== SISTEM JUAL BELI ROLE ====================
+
+// Daftar harga
+bot.command('harga', async (ctx) => {
+    let msg = 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      💰 *DAFTAR HARGA ROLE* 💰
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+    
+    for (const [key, role] of Object.entries(config.roles)) {
+        msg += `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n`;
+        msg += `┃ ${role.name}\n`;
+        msg += `┃ 💵 Harga: Rp ${role.price.toLocaleString()}\n`;
+        msg += `┃ 📅 Durasi: ${role.days} hari\n`;
+        msg += `┃\n`;
+        msg += `┃ 🎁 *Benefits:*\n`;
+        role.benefits.forEach(b => {
+            msg += `┃ ${b}\n`;
+        });
+        msg += `┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+    }
+    
+    msg += 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Cek role sendiri
+bot.command('myrole', async (ctx) => {
+    const userId = ctx.from.id;
+    const role = getRole(userId);
+    const user = getUser(userId);
+    
+    const roleNames = { VIP: '👑 VIP', PREMIUM: '💎 PREMIUM', VVIP: '⭐ VVIP ⭐', FREE: '⚠️ FREE' };
+    const expired = user.roleExpired ? new Date(user.roleExpired).toLocaleDateString('id-ID') : '-';
+    const benefits = config.roles[role]?.benefits || ['• Fitur dasar FREE (cooldown 60 detik)'];
+    
+    let msg = 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      👤 *ROLE KAMU* 👤
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+Role: ${roleNames[role]}
+Expired: ${expired}
+Sales: ${user.salesCount || 0} transaksi
+
+🎁 *Benefits:*
+${benefits.map(b => `┃ ${b}`).join('\n')}
+
+💬 Mau beli atau jual akses? Kirim /jual atau /beli
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Beli role (pembeli)
+bot.command('beli', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+        await ctx.reply(
+`> ❌ *CARA PENGGUNAAN*
+> 
+> /beli <role>
+> 
+> Role: VIP, PREMIUM, VVIP
+> 
+> Contoh:
+> /beli VIP
+> 
+> Pembayaran transfer ke owner.
+> 
+> Atau cari reseller dengan /reseller`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const targetRole = args[1].toUpperCase();
+    if (!['VIP', 'PREMIUM', 'VVIP'].includes(targetRole)) {
+        await ctx.reply('❌ Role tidak valid! Pilih: VIP, PREMIUM, VVIP');
+        return;
+    }
+    
+    const price = config.roles[targetRole]?.price || 0;
+    
+    await ctx.reply(
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      💰 *BELI ${targetRole}* 💰
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+Role: ${targetRole}
+Harga: Rp ${price.toLocaleString()}
+Durasi: 30 hari
+
+📌 *Cara Bayar:*
+1. Transfer ke:
+   Bank BCA: 1234567890
+   a.n. Badak Bot
+2. Screenshot bukti transfer
+3. Kirim ke @tuanmudakyzzy
+4. Tunggu konfirmasi owner
+
+💡 Mau cari yang lebih murah? /reseller
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
+});
+
+// Jual role (reseller)
+bot.command('jual', async (ctx) => {
+    const sellerId = ctx.from.id;
+    const sellerRole = getRole(sellerId);
+    
+    if (sellerRole === 'FREE') {
+        await ctx.reply(
+`> ❌ *TIDAK BISA JUAL*
+> 
+> Role FREE tidak bisa menjual akses.
+> 
+> Upgrade ke VIP, PREMIUM, atau VVIP dulu!
+> 
+> /harga untuk lihat harga upgrade`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const canSell = config.roles[sellerRole]?.canSell || [];
+    
+    let msg = 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      💰 *JUAL AKSES* 💰
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+Role kamu: ${config.roles[sellerRole]?.name}
+Kamu bisa menjual role: ${canSell.join(', ')}
+
+📌 *Cara menjual:*
+/jualkan <userId> <role> [hari]
+
+Contoh:
+/jualkan 123456789 VIP 30
+/jualkan 123456789 PREMIUM 30
+
+💵 Kamu bisa menentukan harga sendiri!
+📊 Komisi: 10-20% dari harga jual
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Jualkan (reseller menjual ke user lain)
+bot.command('jualkan', async (ctx) => {
+    const sellerId = ctx.from.id;
+    const sellerRole = getRole(sellerId);
+    
+    if (sellerRole === 'FREE') {
+        await ctx.reply('❌ Role FREE tidak bisa menjual akses!');
+        return;
+    }
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 3) {
+        await ctx.reply(
+`> ❌ *CARA PENGGUNAAN*
+> 
+> /jualkan <userId> <role> [hari]
+> 
+> Contoh:
+> /jualkan 123456789 VIP 30
+> 
+> Role yang bisa kamu jual: ${config.roles[sellerRole]?.canSell.join(', ')}`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const buyerId = parseInt(args[1]);
+    const targetRole = args[2].toUpperCase();
+    const days = args[3] ? parseInt(args[3]) : 30;
+    
+    // Cek apakah seller boleh jual role ini
+    if (!config.roles[sellerRole]?.canSell?.includes(targetRole)) {
+        await ctx.reply(`❌ Kamu tidak bisa menjual role ${targetRole}! Kamu hanya bisa jual: ${config.roles[sellerRole]?.canSell.join(', ')}`);
+        return;
+    }
+    
+    // Cek apakah buyer sudah punya role lebih tinggi
+    const buyerRole = getRole(buyerId);
+    const roleLevel = { FREE: 0, VIP: 1, PREMIUM: 2, VVIP: 3 };
+    
+    if (roleLevel[targetRole] <= roleLevel[buyerRole]) {
+        await ctx.reply(`❌ User sudah memiliki role ${buyerRole} yang sama atau lebih tinggi!`);
+        return;
+    }
+    
+    // Proses jual
+    setRole(buyerId, targetRole, days, sellerId);
+    
+    const price = getSellPrice(targetRole, sellerId);
+    const seller = getUser(sellerId);
+    
+    await ctx.reply(
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      ✅ *TRANSAKSI BERHASIL* ✅
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+👤 Pembeli: ${buyerId}
+👑 Penjual: @${ctx.from.username || ctx.from.first_name}
+🎁 Role: ${targetRole}
+📅 Durasi: ${days} hari
+💵 Harga jual: Rp ${price.toLocaleString()}
+
+📊 Komisi penjual: Rp ${Math.floor(price * 0.1).toLocaleString()}
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
+    
+    // Notifikasi ke pembeli
+    try {
+        await ctx.telegram.sendMessage(buyerId,
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🎉 *ROLE DIUPDATE!* 🎉
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+Role baru: ${config.roles[targetRole]?.name}
+Durasi: ${days} hari
+Penjual: @${ctx.from.username || ctx.from.first_name}
+
+🎁 *Benefits:*
+${config.roles[targetRole]?.benefits.map(b => `• ${b}`).join('\n')}
+
+Nikmati fiturnya! 🦏
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
+    } catch(e) {}
+});
+
+// List reseller
+bot.command('reseller', async (ctx) => {
+    const users = getAllUsers();
+    let resellers = [];
+    
+    for (const [id, user] of Object.entries(users)) {
+        const role = getRole(parseInt(id));
+        if (role !== 'FREE' && user.salesCount > 0) {
+            resellers.push({
+                id: id,
+                name: user.name || 'Unknown',
+                role: role,
+                sales: user.salesCount
+            });
+        }
+    }
+    
+    if (resellers.length === 0) {
+        await ctx.reply('📭 Belum ada reseller terdaftar.');
+        return;
+    }
+    
+    let msg = 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🤝 *DAFTAR RESELLER* 🤝
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+    
+    resellers.forEach((r, i) => {
+        msg += `┃ ${i+1}. ${r.name}\n`;
+        msg += `┃    Role: ${r.role}\n`;
+        msg += `┃    Penjualan: ${r.sales} transaksi\n`;
+        msg += `┃\n`;
+    });
+    
+    msg += 
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Owner: set role langsung
+bot.command('setrole', async (ctx) => {
+    if (ctx.from.id !== config.owner) return;
+    
+    const args = ctx.message.text.split(' ');
+    if (args.length < 3) {
+        await ctx.reply(
+`> ❌ *CARA PENGGUNAAN*
+> 
+> /setrole <userId> <role> [hari]
+> 
+> Role: FREE, VIP, PREMIUM, VVIP
+> 
+> Contoh:
+> /setrole 123456789 VIP 30`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const userId = parseInt(args[1]);
+    const role = args[2].toUpperCase();
+    const days = args[3] ? parseInt(args[3]) : 30;
+    
+    if (!['FREE', 'VIP', 'PREMIUM', 'VVIP'].includes(role)) {
+        await ctx.reply('❌ Role tidak valid! Pilih: FREE, VIP, PREMIUM, VVIP');
+        return;
+    }
+    
+    setRole(userId, role, days);
+    
+    const roleNames = { VIP: '👑 VIP', PREMIUM: '💎 PREMIUM', VVIP: '⭐ VVIP ⭐', FREE: '⚠️ FREE' };
+    
+    await ctx.reply(
+`> ✅ *ROLE UPDATED*
+> 
+> User ID: ${userId}
+> Role: ${roleNames[role]}
+> Durasi: ${days} hari`, { parse_mode: 'Markdown' });
+    
+    try {
+        await ctx.telegram.sendMessage(userId,
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      🎉 *ROLE DIUPDATE!* 🎉
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+Role baru: ${roleNames[role]}
+Durasi: ${days} hari
+
+Nikmati fiturnya! 🦏
+
+╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃  👑 @tuanmudakyzzy
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
+    } catch(e) {}
+});
+
 // CEK USER
 bot.action('admin_cekuser', async (ctx) => {
     if (!await isOwner(ctx.from.id)) return;
