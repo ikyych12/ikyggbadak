@@ -1,13 +1,13 @@
 const { isOnCooldown, randomInt, sleep, getRemainingCooldown } = require('./utils');
 const { getUser, updateUser, isPremium } = require('./database');
-const { generateBadakThumbnail } = require('./canvas');
 const { Markup } = require('telegraf');
 const config = require('./config');
 
-async function badakCommand(ctx, nomor) {
+async function badakCommand(ctx, nomor, customCooldown) {
     const userId = ctx.from.id;
     const user = getUser(userId);
     const premium = isPremium(userId);
+    const botUsername = ctx.botInfo.username;
     
     if (!nomor) {
         const text = 
@@ -45,9 +45,10 @@ async function badakCommand(ctx, nomor) {
     }
     
     if (!premium) {
-        const onCooldown = isOnCooldown(user.lastBadak || 0, config.badak.cooldownFree);
+        const freeCooldown = customCooldown ? customCooldown.free : config.badak.cooldownFree;
+        const onCooldown = isOnCooldown(user.lastBadak || 0, freeCooldown);
         if (onCooldown) {
-            const remaining = getRemainingCooldown(user.lastBadak, config.badak.cooldownFree);
+            const remaining = getRemainingCooldown(user.lastBadak, freeCooldown);
             await ctx.reply(`> ⏰ *COOLDOWN!*\n> \n> Tunggu ${remaining} detik lagi.\n> \n> 💎 Premium = tanpa cooldown`, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
@@ -73,7 +74,6 @@ async function badakCommand(ctx, nomor) {
     await sleep(500);
     
     const isSuccess = randomInt(1, 100) > 20;
-    const botUsername = ctx.botInfo.username;
     
     if (isSuccess) {
         const newTotal = (user.totalBadak || 0) + 1;
@@ -86,7 +86,6 @@ async function badakCommand(ctx, nomor) {
         
         await ctx.deleteMessage(loadingMsg.message_id);
         
-        // FORMAT SETELAH BADAK BERHASIL
         const successText = 
 `> ✅ *TERIMAKASIH SUDAH BADAK DI BOT*
 > 
@@ -111,7 +110,7 @@ async function badakCommand(ctx, nomor) {
 > 3️⃣ Pasang 2FA
 > 4️⃣ Masuk GB dan CH bebas
 > 5️⃣ Pasang proxy di pengaturan WA (1.1.1.1)
-> 6️⃣ Diamkan 3-7 hari
+> 6️⃣ Diamkan 3-7 jam
 > 7️⃣ Coba dulu chatan 1-10 chat. Jika kena limit, pasang lagi proxy
 > 8️⃣ Tunggu sampai bisa ya!
 > 
@@ -126,7 +125,7 @@ async function badakCommand(ctx, nomor) {
         await ctx.reply(successText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.url('🔥 HUBUNG OWNER (GACOR)', `https://t.me/tuanmudakyzzy`)],
+                [Markup.button.url('🔥 HUBUNG OWNER (GACOR)', 'https://t.me/tuanmudakyzzy')],
                 [Markup.button.callback('🦏 BADAK LAGI', 'badak_lagi'), Markup.button.callback('📋 LIST BADAK', 'mybadak')],
                 [Markup.button.callback('💎 UPGRADE PREMIUM', 'info_premium')]
             ])
@@ -135,7 +134,6 @@ async function badakCommand(ctx, nomor) {
     } else {
         await ctx.deleteMessage(loadingMsg.message_id);
         
-        // FORMAT SETELAH BADAK GAGAL
         const failedText = 
 `> ❌ *GAGAL BADAK!*
 > 
@@ -159,7 +157,7 @@ async function badakCommand(ctx, nomor) {
         await ctx.reply(failedText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.url('💎 UPGRADE PREMIUM', `https://t.me/tuanmudakyzzy`)],
+                [Markup.button.url('💎 UPGRADE PREMIUM', 'https://t.me/tuanmudakyzzy')],
                 [Markup.button.callback('🔄 COBA LAGI', 'badak_lagi')]
             ])
         });
@@ -171,8 +169,6 @@ async function mybadakCommand(ctx) {
     const userId = ctx.from.id;
     const user = getUser(userId);
     const badakList = user.badakList || [];
-    const premium = isPremium(userId);
-    const botUsername = ctx.botInfo.username;
     
     if (badakList.length === 0) {
         await ctx.reply(`> 📭 *DAFTAR NOMOR KEBAL*\n> \n> Kamu belum membadaki nomor apapun.\n> \n> Gunakan /badak <nomor> untuk mulai!`, {
