@@ -20,6 +20,40 @@ function getCountryCode(nomor) {
     return null;
 }
 
+// Fungsi hitung umur dari masa aktif
+function hitungUmur(masaAktif) {
+    const [tahun, bulan, hari] = masaAktif.split('-').map(Number);
+    const tanggalAktif = new Date(tahun, bulan - 1, hari);
+    const sekarang = new Date();
+    
+    let tahunUmur = sekarang.getFullYear() - tanggalAktif.getFullYear();
+    let bulanUmur = sekarang.getMonth() - tanggalAktif.getMonth();
+    let hariUmur = sekarang.getDate() - tanggalAktif.getDate();
+    
+    if (hariUmur < 0) {
+        bulanUmur--;
+        const bulanLalu = new Date(sekarang.getFullYear(), sekarang.getMonth(), 0);
+        hariUmur += bulanLalu.getDate();
+    }
+    
+    if (bulanUmur < 0) {
+        tahunUmur--;
+        bulanUmur += 12;
+    }
+    
+    return { tahun: tahunUmur, bulan: bulanUmur, hari: hariUmur };
+}
+
+function formatUmur(umur) {
+    if (umur.tahun >= 1) {
+        return `${umur.tahun} tahun ${umur.bulan} bulan`;
+    } else if (umur.bulan >= 1) {
+        return `${umur.bulan} bulan ${umur.hari} hari`;
+    } else {
+        return `${umur.hari} hari`;
+    }
+}
+
 function generateCekUmur(nomor, isPremiumUser = false) {
     const seed = simpleHash(nomor);
     function seededRandom(min, max) {
@@ -54,12 +88,20 @@ function generateCekUmur(nomor, isPremiumUser = false) {
     const aktifHari = seededRandom(1, 28);
     const masaAktif = `${aktifTahun}-${String(aktifBulan).padStart(2, '0')}-${String(aktifHari).padStart(2, '0')}`;
     
+    // Hitung umur dari masa aktif
+    const umurData = hitungUmur(masaAktif);
+    const umurText = formatUmur(umurData);
+    
     const statusList = ["Active", "Inactive", "Pending", "Suspended"];
     const status = statusList[seededRandom(0, statusList.length - 1)];
     const tipeList = ["Prepaid", "Postpaid", "Corporate", "Residential"];
     const tipe = tipeList[seededRandom(0, tipeList.length - 1)];
     
-    return { nomor, negara, provider, wilayah, masaAktif, status, tipe, lastCek: new Date().toISOString() };
+    return { 
+        nomor, negara, provider, wilayah, masaAktif, 
+        umur: umurText, umurTahun: umurData.tahun, umurBulan: umurData.bulan, umurHari: umurData.hari,
+        status, tipe, lastCek: new Date().toISOString() 
+    };
 }
 
 async function cekumurCommand(ctx, nomor) {
@@ -152,12 +194,11 @@ async function cekumurCommand(ctx, nomor) {
 > > ┃ 📡 Provider: ${data.provider}
 > > ┃ 📍 Wilayah: ${data.wilayah}
 > > ┃ 📅 Masa Aktif: ${data.masaAktif}
+> > ┃ 🕐 Umur: ${data.umur}
 > > ┃ 🔰 Status: ${data.status}
 > > ┃ 🏷️ Tipe: ${data.tipe}
 > > ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━
-> > 
-> > 🕐 Terakhir dicek: ${new Date(data.lastCek).toLocaleString('id-ID')}
-> > 🔒 Hasil permanen (sama jika dicek siapapun)
+> >
 > 
 > ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 > 
