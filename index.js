@@ -1,271 +1,14 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const { TelegramClient } = require('telegram');
-const { StringSession } = require('telegram/sessions');
-const input = require('input');
 const config = require('./config');
 const { initDB, isPremium, setPremium, getAllUsers, getUser, updateUser } = require('./database');
 const { badakCommand, prosesBadak, pendingBadak } = require('./badak');
 const { cekumurCommand } = require('./cekumur');
 const { checkMembership } = require('./middleware');
 
-// ==================== BOT UTAMA ====================
 const bot = new Telegraf(config.token);
 initDB();
-
-// Middleware
 bot.use(checkMembership);
-
-// ==================== USERBOT (AKUN ASLI) ====================
-let userbotClient = null;
-let isUserbotReady = false;
-const SESSION_FILE = './userbot_session.json';
-
-// Load session userbot
-async function loadUserbotSession() {
-    if (!fs.existsSync(SESSION_FILE)) {
-        console.log('📌 Belum pairing, ketik /pairing di bot');
-        return null;
-    }
-    
-    try {
-        const saved = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
-        const stringSession = new StringSession(saved.session);
-        const client = new TelegramClient(stringSession, config.api_id, config.api_hash, {
-            connectionRetries: 5,
-        });
-        
-        await client.connect();
-        const me = await client.getMe();
-        console.log(`✅ Userbot loaded: ${me.firstName} (@${me.username || 'no username'})`);
-        return client;
-    } catch (error) {
-        console.log('❌ Gagal load userbot:', error.message);
-        return null;
-    }
-}
-
-// Pairing function
-async function doPairing(ctx) {
-    await ctx.reply(
-`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃      🔐 *PROSES PAIRING* 🔐
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-> 📱 Buka TERMINUX Termux
-> 👀 Ikuti instruksi yang muncul
-
-> *Pastikan:*
-> • API ID dan HASH sudah benar
-> • Koneksi internet stabil
-
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃  👑 @tuanmudakyzzy
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
-    
-    const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, config.api_id, config.api_hash, {
-        connectionRetries: 5,
-    });
-    
-    await client.start({
-        phoneNumber: async () => {
-            console.log('\n📱 Masukkan nomor Telegram:');
-            return await input.text('Nomor: ');
-        },
-        password: async () => {
-            console.log('🔑 Masukkan password (jika ada):');
-            return await input.text('Password: ');
-        },
-        phoneCode: async () => {
-            console.log('📨 Masukkan kode verifikasi dari Telegram:');
-            return await input.text('Kode: ');
-        },
-        onError: (err) => console.log(err),
-    });
-    
-    const me = await client.getMe();
-    const sessionString = client.session.save();
-    
-    fs.writeFileSync(SESSION_FILE, JSON.stringify({
-        session: sessionString,
-        userId: me.id,
-        username: me.username,
-        firstName: me.firstName
-    }, null, 2));
-    
-    console.log('\n✅ Pairing berhasil!');
-    console.log(`📱 Nama: ${me.firstName}`);
-    console.log(`🆔 ID: ${me.id}`);
-    
-    await ctx.reply(
-`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃      ✅ *PAIRING BERHASIL!* ✅
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-> 👤 Nama: ${me.firstName}
-> 🆔 ID: \`${me.id}\`
-> 🔗 Username: @${me.username || '-'}
-
-> *Userbot siap digunakan!*
-
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃  👑 @tuanmudakyzzy
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
-    
-    return client;
-}
-
-// ==================== PERINTAH DARI AKUN ASLI (USERBOT) ====================
-async function handleUserbotCommand(event) {
-    const text = event.message.text;
-    if (!text) return;
-    
-    // List premium
-    if (text === '/listpremium') {
-        const users = getAllUsers();
-        let reply = "💎 *DAFTAR PREMIUM*\n\n";
-        let found = false;
-        
-        for (const [id, user] of Object.entries(users)) {
-            if (user.premium) {
-                found = true;
-                reply += `👤 ${user.name || 'Unknown'} (${id})\n`;
-                reply += `   └ Expired: ${user.premiumExpired || 'Permanent'}\n\n`;
-            }
-        }
-        
-        await event.reply(reply || "📭 Belum ada user premium.", { parseMode: 'md' });
-    }
-    
-    // Stats
-    if (text === '/stats') {
-        const users = getAllUsers();
-        const total = Object.keys(users).length;
-        const premium = Object.values(users).filter(u => u.premium).length;
-        let totalBadak = 0;
-        for (const u of Object.values(users)) totalBadak += (u.totalBadak || 0);
-        
-        await event.reply(
-`📊 *STATISTIK BOT*
-👥 Total User: ${total}
-💎 Premium: ${premium}
-🦏 Total Badakan: ${totalBadak}`, { parseMode: 'md' });
-    }
-    
-    // Add premium
-    if (text.startsWith('/addpremium ')) {
-        const args = text.split(' ');
-        if (args.length < 2) return;
-        const userId = parseInt(args[1]);
-        const days = args[2] ? parseInt(args[2]) : 30;
-        const expired = new Date();
-        expired.setDate(expired.getDate() + days);
-        
-        setPremium(userId, true, expired.toISOString());
-        await event.reply(`✅ User ${userId} jadi PREMIUM ${days} hari!`);
-    }
-    
-    // Remove premium
-    if (text.startsWith('/removepremium ')) {
-        const userId = parseInt(text.split(' ')[1]);
-        setPremium(userId, false, null);
-        await event.reply(`✅ Premium user ${userId} dihapus!`);
-    }
-    
-    // List nomor
-    if (text === '/listnomor') {
-        const users = getAllUsers();
-        let reply = "📋 *NOMOR DIBAKADAI*\n\n";
-        let total = 0;
-        
-        for (const [id, user] of Object.entries(users)) {
-            const badakList = user.badakList || [];
-            if (badakList.length > 0) {
-                total += badakList.length;
-                reply += `👤 ${user.name || id}: ${badakList.length} nomor\n`;
-                badakList.slice(-3).forEach(b => {
-                    reply += `   └ ${b.nomor} (${b.range})\n`;
-                });
-                reply += '\n';
-            }
-        }
-        
-        await event.reply(total === 0 ? "📭 Belum ada nomor dibadaki" : reply, { parseMode: 'md' });
-    }
-    
-    // Cek user
-    if (text.startsWith('/cekuser ')) {
-        const userId = parseInt(text.split(' ')[1]);
-        const user = getUser(userId);
-        
-        await event.reply(
-`👤 *DETAIL USER*
-ID: ${user.id}
-Nama: ${user.name || 'Unknown'}
-Premium: ${user.premium ? '✅' : '❌'}
-Total Badak: ${user.totalBadak || 0}
-List Badak: ${user.badakList ? user.badakList.length : 0} nomor`, { parseMode: 'md' });
-    }
-    
-    // Reset user
-    if (text.startsWith('/resetuser ')) {
-        const userId = parseInt(text.split(' ')[1]);
-        updateUser(userId, {
-            totalBadak: 0,
-            badakList: [],
-            lastBadak: 0
-        });
-        await event.reply(`✅ Data user ${userId} direset!`);
-    }
-    
-    // Broadcast
-    if (text.startsWith('/broadcast ')) {
-        const pesan = text.replace('/broadcast', '').trim();
-        const users = getAllUsers();
-        let sukses = 0, gagal = 0;
-        
-        for (const [id] of Object.entries(users)) {
-            try {
-                await event.client.sendMessage(parseInt(id), 
-`📢 *BROADCAST*
-${pesan}
-
-- Badak Bot 🦏`, { parseMode: 'md' });
-                sukses++;
-            } catch(e) { gagal++; }
-            await new Promise(r => setTimeout(r, 50));
-        }
-        
-        await event.reply(`✅ Broadcast selesai!\n📨 Sukses: ${sukses}\n❌ Gagal: ${gagal}`);
-    }
-    
-    // Shutdown
-    if (text === '/shutdown') {
-        await event.reply("🛑 Mematikan bot...");
-        process.exit(0);
-    }
-    
-    // Help
-    if (text === '/help' || text === '/start') {
-        await event.reply(
-`🤖 *USERBOT AKUN ASLI*
-
-📋 *Perintah:*
-/listpremium - List user premium
-/addpremium <id> [hari]
-/removepremium <id>
-/listnomor - List nomor dibadaki
-/cekuser <id>
-/resetuser <id>
-/stats - Statistik bot
-/broadcast <pesan>
-/shutdown - Matikan bot
-/help - Bantuan ini
-
-👑 @tuanmudakyzzy`, { parseMode: 'md' });
-    }
-}
 
 // ==================== VARIABLE GLOBAL ====================
 const bannedUsers = new Set();
@@ -277,7 +20,6 @@ function loadBannedUsers() {
         data.forEach(id => bannedUsers.add(id));
     }
 }
-
 function saveBannedUsers() {
     fs.writeFileSync(BANNED_FILE, JSON.stringify([...bannedUsers], null, 2));
 }
@@ -306,7 +48,7 @@ async function checkBanned(ctx, next) {
 }
 bot.use(checkBanned);
 
-// ==================== ACTION BUTTON HANDLERS ====================
+// ==================== ACTION BUTTONS ====================
 bot.action('badak_lagi', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply(`> 🦏 *MASUKKAN NOMOR*\n> \n> Contoh: /badak 628123456789`, { parse_mode: 'Markdown' });
@@ -449,52 +191,6 @@ bot.action('verify_join', async (ctx) => {
 });
 
 // ==================== BOT COMMANDS ====================
-
-// Pairing command (di bot utama)
-bot.command('pairing', async (ctx) => {
-    if (ctx.from.id !== config.owner) {
-        await ctx.reply('❌ Perintah ini hanya untuk owner!');
-        return;
-    }
-    
-    if (isUserbotReady) {
-        await ctx.reply('✅ Userbot sudah terpair!');
-        return;
-    }
-    
-    try {
-        userbotClient = await doPairing(ctx);
-        isUserbotReady = true;
-        
-        // Listen pesan dari akun asli
-        userbotClient.addEventHandler(handleUserbotCommand);
-        console.log('✅ Userbot listener aktif');
-        
-    } catch (error) {
-        await ctx.reply(`❌ Pairing gagal: ${error.message}`);
-    }
-});
-
-// Status userbot
-bot.command('statusbot', async (ctx) => {
-    if (ctx.from.id !== config.owner) return;
-    
-    const status = isUserbotReady ? '✅ AKTIF' : '❌ TIDAK AKTIF';
-    await ctx.reply(
-`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃      🤖 *STATUS USERBOT* 🤖
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-> Status: ${status}
-> 
-> ${!isUserbotReady ? 'Gunakan /pairing untuk memulai' : 'Userbot siap!'}
-
-╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃  👑 @tuanmudakyzzy
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`, { parse_mode: 'Markdown' });
-});
-
-// Start command
 bot.command('start', async (ctx) => {
     const user = getUser(ctx.from.id);
     const premium = isPremium(ctx.from.id);
@@ -542,7 +238,6 @@ bot.command('start', async (ctx) => {
     
     if (isOwnerUser) {
         keyboard.push([Markup.button.callback('👑 MENU ADMIN', 'admin_menu')]);
-        keyboard.push([Markup.button.callback('🔐 PAIRING USERBOT', 'pairing_menu')]);
     }
     
     await ctx.reply(text, { 
@@ -551,7 +246,6 @@ bot.command('start', async (ctx) => {
     });
 });
 
-// Premium command
 bot.command('premium', async (ctx) => {
     const userId = ctx.from.id;
     const premium = isPremium(userId);
@@ -608,14 +302,12 @@ bot.command('premium', async (ctx) => {
     });
 });
 
-// Badak command
 bot.command('badak', async (ctx) => {
     const args = ctx.message.text.split(' ');
     const nomor = args[1];
     await badakCommand(ctx, nomor);
 });
 
-// Mybadak command
 bot.command('mybadak', async (ctx) => {
     const userId = ctx.from.id;
     const user = getUser(userId);
@@ -638,7 +330,6 @@ bot.command('mybadak', async (ctx) => {
     await ctx.reply(listMsg, { parse_mode: 'Markdown' });
 });
 
-// Cekumur command
 bot.command('cekumur', async (ctx) => {
     const args = ctx.message.text.split(' ');
     const nomor = args[1];
@@ -646,7 +337,6 @@ bot.command('cekumur', async (ctx) => {
 });
 
 // ==================== OWNER COMMANDS ====================
-
 async function isOwner(userId) {
     return userId === config.owner;
 }
@@ -675,12 +365,6 @@ Pilih fitur di bawah ini:`;
             [Markup.button.callback('🛑 SHUTDOWN', 'admin_shutdown'), Markup.button.callback('❌ TUTUP', 'close_admin_menu')]
         ])
     });
-});
-
-bot.action('pairing_menu', async (ctx) => {
-    if (ctx.from.id !== config.owner) return;
-    await ctx.answerCbQuery();
-    await ctx.reply('🔐 Ketik /pairing untuk memulai pairing userbot');
 });
 
 bot.action('close_admin_menu', async (ctx) => {
@@ -1067,55 +751,15 @@ bot.action('admin_shutdown', async (ctx) => {
     process.exit(0);
 });
 
-// STATS Command
-bot.command('stats', async (ctx) => {
-    if (!await isOwner(ctx.from.id)) return;
-    
-    const users = getAllUsers();
-    const total = Object.keys(users).length;
-    const premium = Object.values(users).filter(u => u.premium).length;
-    
-    let totalBadak = 0;
-    for (const u of Object.values(users)) {
-        totalBadak += (u.totalBadak || 0);
-    }
-    
-    await ctx.reply(
-`> 📊 *STATISTIK BOT*
-> 
-> 👥 Total User: ${total}
-> 💎 Premium User: ${premium}
-> 🦏 Total Badakan: ${totalBadak}
-> ⚙️ Cooldown Free: ${customCooldown.free / 1000} detik
-> ⚙️ Cooldown Premium: ${customCooldown.premium / 1000} detik
-> 🚫 Banned User: ${bannedUsers.size}`,
-        { parse_mode: 'Markdown' }
-    );
-});
-
 // ==================== START BOT ====================
-async function start() {
-    // Load userbot session
-    userbotClient = await loadUserbotSession();
-    if (userbotClient) {
-        isUserbotReady = true;
-        userbotClient.addEventHandler(handleUserbotCommand);
-        console.log('✅ Userbot listener aktif dari session');
-    }
-    
-    // Start bot utama
-    bot.launch();
+bot.launch().then(() => {
     console.log('╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮');
     console.log('┃      🦏 BADAK BOT JALAN 🦏');
     console.log('╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯');
     console.log(`📋 Owner ID: ${config.owner}`);
-    console.log(`🤖 Userbot: ${isUserbotReady ? 'AKTIF' : 'TIDAK AKTIF (ketik /pairing)'}`);
-}
-
-start();
-
-process.once('SIGINT', () => {
-    bot.stop('SIGINT');
-    if (userbotClient) userbotClient.disconnect();
-    process.exit();
+    console.log(`⚙️ Cooldown Free: ${customCooldown.free / 1000} detik`);
+    console.log(`⚙️ Cooldown Premium: ${customCooldown.premium / 1000} detik`);
 });
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
