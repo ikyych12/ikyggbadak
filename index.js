@@ -110,6 +110,326 @@ bot.action('contoh_badak', async (ctx) => {
     await ctx.reply(`> 📝 *CONTOH BADAK*\n> \n> /badak 628123456789\n> \n> Hasilnya akan membuat nomor tersebut KEBAL BADAK!`, { parse_mode: 'Markdown' });
 });
 
+
+// ==================== MENU ADMIN (OWNER ONLY) ====================
+
+bot.action('admin_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    const userId = ctx.from.id;
+    
+    if (userId !== config.owner) {
+        await ctx.reply(`> ❌ *AKSES DITOLAK*\n> \n> Menu ini hanya untuk owner!`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    const text = 
+`> 👑 *MENU ADMIN BADAK BOT*
+> 
+> Pilih fitur di bawah ini:
+> 
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    
+    await ctx.reply(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('💎 TAMBAH PREMIUM', 'admin_addpremium')],
+            [Markup.button.callback('🗑️ HAPUS PREMIUM', 'admin_removepremium')],
+            [Markup.button.callback('📋 LIST PREMIUM', 'admin_listpremium')],
+            [Markup.button.callback('⚙️ SET COOLDOWN', 'admin_cooldown')],
+            [Markup.button.callback('🚫 BAN USER', 'admin_ban')],
+            [Markup.button.callback('✅ UNBAN USER', 'admin_unban')],
+            [Markup.button.callback('📋 LIST BAN', 'admin_listban')],
+            [Markup.button.callback('📊 STATS', 'admin_stats')],
+            [Markup.button.callback('📢 BROADCAST', 'admin_broadcast')],
+            [Markup.button.callback('📋 LIST NOMOR', 'admin_listnomor')],
+            [Markup.button.callback('🔄 RESET USER', 'admin_resetuser')],
+            [Markup.button.callback('💾 BACKUP', 'admin_backup')],
+            [Markup.button.callback('🛑 SHUTDOWN', 'admin_shutdown')],
+            [Markup.button.callback('❌ TUTUP MENU', 'close_admin_menu')]
+        ])
+    });
+});
+
+// Tombol tutup menu
+bot.action('close_admin_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+});
+
+// ==================== SUB MENU ADMIN ====================
+
+// Tambah Premium
+bot.action('admin_addpremium', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> 💎 *TAMBAH PREMIUM*
+> 
+> Kirim perintah:
+> /addpremium <userId> [hari]
+> 
+> Contoh:
+> /addpremium 123456789 30
+> 
+> Ketik /batal untuk membatalkan.`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// Hapus Premium
+bot.action('admin_removepremium', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> 🗑️ *HAPUS PREMIUM*
+> 
+> Kirim perintah:
+> /removepremium <userId>
+> 
+> Contoh:
+> /removepremium 123456789`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// List Premium
+bot.action('admin_listpremium', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    const users = getAllUsers();
+    const premiumUsers = [];
+    
+    for (const [id, user] of Object.entries(users)) {
+        if (user.premium) {
+            premiumUsers.push({ id, name: user.name || 'Unknown', expired: user.premiumExpired });
+        }
+    }
+    
+    if (premiumUsers.length === 0) {
+        await ctx.reply(`> 📭 *DAFTAR PREMIUM*\n> \n> Belum ada user premium.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    let msg = `> 💎 *DAFTAR USER PREMIUM* (${premiumUsers.length})\n> \n`;
+    premiumUsers.forEach((u, i) => {
+        const expired = u.expired ? new Date(u.expired).toLocaleDateString('id-ID') : 'Permanent';
+        msg += `> ${i+1}. ${u.name}\n>    └ ID: ${u.id} | Expired: ${expired}\n`;
+    });
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Set Cooldown
+bot.action('admin_cooldown', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> ⚙️ *SET COOLDOWN*
+> 
+> Kirim perintah:
+> /setcooldown <free/premium> <detik>
+> 
+> Contoh:
+> /setcooldown free 30
+> /setcooldown premium 0
+> 
+> 📊 *Cooldown Saat Ini:*
+> Free: ${customCooldown.free / 1000} detik
+> Premium: ${customCooldown.premium / 1000} detik`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// Ban User
+bot.action('admin_ban', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> 🚫 *BAN USER*
+> 
+> Kirim perintah:
+> /ban <userId> [alasan]
+> 
+> Contoh:
+> /ban 123456789 Spam`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// Unban User
+bot.action('admin_unban', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> ✅ *UNBAN USER*
+> 
+> Kirim perintah:
+> /unban <userId>
+> 
+> Contoh:
+> /unban 123456789`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// List Ban
+bot.action('admin_listban', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    if (bannedUsers.size === 0) {
+        await ctx.reply(`> 📭 *DAFTAR BAN*\n> \n> Belum ada user yang diban.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    let msg = `> 🚫 *DAFTAR USER BANNED* (${bannedUsers.size})\n> \n`;
+    let i = 1;
+    for (const id of bannedUsers) {
+        msg += `> ${i++}. User ID: ${id}\n`;
+    }
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Stats
+bot.action('admin_stats', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    const users = getAllUsers();
+    const total = Object.keys(users).length;
+    const premium = Object.values(users).filter(u => u.premium).length;
+    
+    let totalBadak = 0;
+    for (const u of Object.values(users)) {
+        totalBadak += (u.totalBadak || 0);
+    }
+    
+    await ctx.reply(
+`> 📊 *STATISTIK BOT*
+> 
+> 👥 Total User: ${total}
+> 💎 Premium User: ${premium}
+> 🦏 Total Badakan: ${totalBadak}
+> ⚙️ Cooldown Free: ${customCooldown.free / 1000} detik
+> ⚙️ Cooldown Premium: ${customCooldown.premium / 1000} detik
+> 🚫 Banned User: ${bannedUsers.size}`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// Broadcast
+bot.action('admin_broadcast', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> 📢 *BROADCAST*
+> 
+> Kirim perintah:
+> /broadcast <pesan>
+> 
+> Contoh:
+> /broadcast Halo semua!`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// List Nomor
+bot.action('admin_listnomor', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    const users = getAllUsers();
+    let allBadak = [];
+    
+    for (const [userId, user] of Object.entries(users)) {
+        if (user.badakList && user.badakList.length > 0) {
+            for (const badak of user.badakList) {
+                allBadak.push({
+                    userId: userId,
+                    userName: user.name || 'Unknown',
+                    nomor: badak.nomor,
+                    range: badak.range,
+                    tanggal: badak.date
+                });
+            }
+        }
+    }
+    
+    if (allBadak.length === 0) {
+        await ctx.reply(`> 📭 *LIST NOMOR*\n> \n> Belum ada nomor yang dibadaki.`, { parse_mode: 'Markdown' });
+        return;
+    }
+    
+    allBadak.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    
+    let msg = `> 📋 *LIST SEMUA NOMOR YANG DIBAKADAI*\n> \n> Total: ${allBadak.length} nomor\n> \n`;
+    
+    const displayCount = Math.min(20, allBadak.length);
+    for (let i = 0; i < displayCount; i++) {
+        const b = allBadak[i];
+        const date = new Date(b.tanggal).toLocaleDateString('id-ID');
+        msg += `> ${i+1}. 📞 \`${b.nomor}\`\n`;
+        msg += `>    └ 👤 ${b.userName} (${b.userId}) | ${b.range} | ${date}\n`;
+    }
+    
+    if (allBadak.length > 20) {
+        msg += `> \n> 📌 Menampilkan 20 terbaru dari ${allBadak.length} nomor`;
+    }
+    
+    await ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Reset User
+bot.action('admin_resetuser', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(
+`> 🔄 *RESET USER*
+> 
+> Kirim perintah:
+> /resetuser <userId>
+> 
+> Contoh:
+> /resetuser 123456789`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// Backup
+bot.action('admin_backup', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    const date = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const backupName = `backup_${date}.json`;
+    
+    try {
+        const users = getAllUsers();
+        fs.writeFileSync(backupName, JSON.stringify(users, null, 2));
+        await ctx.replyWithDocument({ source: backupName }, { caption: `📦 Backup database ${date}` });
+        fs.unlinkSync(backupName);
+    } catch (e) {
+        await ctx.reply(`> ❌ *BACKUP GAGAL*\n> \n> ${e.message}`, { parse_mode: 'Markdown' });
+    }
+});
+
+// Shutdown
+bot.action('admin_shutdown', async (ctx) => {
+    await ctx.answerCbQuery();
+    if (ctx.from.id !== config.owner) return;
+    
+    await ctx.reply(`> 🛑 *BOT SHUTDOWN*\n> \n> Bot akan dimatikan.`, { parse_mode: 'Markdown' });
+    process.exit(0);
+});
 // ==================== BADAK RANGE BUTTONS ====================
 
 bot.action(/badak_range_(.+)/, async (ctx) => {
