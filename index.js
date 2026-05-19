@@ -39,13 +39,13 @@ loadBannedUsers();
 loadCooldown();
 
 async function checkBanned(ctx, next) {
+    if (!ctx.from) return next();
     if (bannedUsers.has(ctx.from.id)) {
         await ctx.reply(`> ⚠️ *ANDA DIBAN!*\n> \n> Anda tidak bisa menggunakan bot ini.`, { parse_mode: 'Markdown' });
         return;
     }
     return next();
 }
-bot.use(checkBanned);
 
 // ==================== ACTION BUTTONS ====================
 bot.action('badak_lagi', async (ctx) => {
@@ -854,7 +854,7 @@ bot.command('reseller', async (ctx) => {
 
 // Owner: set role langsung
 bot.command('setrole', async (ctx) => {
-    if (ctx.from.id !== config.owner) return;
+    if (!ctx.from || ctx.from.id !== config.owner) return;
     
     const args = ctx.message.text.split(' ');
     if (args.length < 3) {

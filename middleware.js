@@ -2,6 +2,11 @@ const config = require('./config');
 const { Markup } = require('telegraf');
 
 async function checkMembership(ctx, next) {
+    // Cek apakah pesan dari user (bukan dari channel)
+    if (!ctx.from) {
+        return next();
+    }
+    
     const userId = ctx.from.id;
     
     if (userId === config.owner) return next();
@@ -40,7 +45,8 @@ async function checkMembership(ctx, next) {
         
         return next();
     } catch (error) {
-        await ctx.reply('❌ Error cek keanggotaan, coba lagi nanti.');
+        console.error('Error cek membership:', error.message);
+        return next();
     }
 }
 
