@@ -1,6 +1,5 @@
 const { randomInt, sleep } = require('./utils');
 const { getCekUmur, setCekUmur, isPremium } = require('./database');
-const { generateCekUmurThumbnail } = require('./canvas');
 const { Markup } = require('telegraf');
 const config = require('./config');
 
@@ -66,7 +65,6 @@ function generateCekUmur(nomor, isPremiumUser = false) {
 async function cekumurCommand(ctx, nomor) {
     const userId = ctx.from.id;
     const premium = isPremium(userId);
-    const botUsername = ctx.botInfo.username;
     
     if (!nomor) {
         const text = 
@@ -138,7 +136,6 @@ async function cekumurCommand(ctx, nomor) {
         return;
     }
     
-    // FORMAT HASIL CEKUMUR SESUAI PERMINTAAN
     const username = ctx.from.username || ctx.from.first_name;
     const resultText = 
 `> *HALLO PENGGUNA @${username}*
