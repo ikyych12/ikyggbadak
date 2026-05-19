@@ -10,7 +10,6 @@ const { checkMembership } = require('./middleware');
 const { Api, TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const input = require('input');
-const fs = require('fs');
 
 // Konfigurasi userbot (dari my.telegram.org)
 const apiId = config.api_id;
